@@ -1,0 +1,6 @@
+*.swp
+npm-debug.log
+main.js
+
+elm-stuff
+node_modules

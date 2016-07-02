@@ -1,0 +1,23 @@
+{
+    "version": "1.0.0",
+    "summary": "",
+    "repository": "https://github.com/tunguski/elm-server.git",
+    "license": "BSD-3-Clause",
+    "source-directories": [
+        "."
+    ],
+    "exposed-modules": [],
+    "native-modules": true,
+    "dependencies": {
+        "elm-community/elm-json-extra": "1.0.0 <= v < 2.0.0",
+        "elm-lang/core": "3.0.0 <= v < 4.0.0",
+        "elm-lang/html": "1.0.0 <= v < 2.0.0",
+        "elm-lang/window": "1.0.0 <= v < 2.0.0",
+        "elm-lang/navigation": "1.0.0 <= v < 2.0.0",
+        "elm-community/list-extra": "2.0.0 <= v < 3.0.0",
+        "evancz/elm-markdown": "3.0.0 <= v < 4.0.0",
+        "ohanhi/keyboard-extra": "1.0.0 <= v < 2.0.0",
+        "mdgriffith/elm-style-animation": "1.0.0 <= v < 2.0.0"
+    },
+    "elm-version": "0.17.0 <= v < 0.18.0"
+}
