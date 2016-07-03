@@ -1,17 +1,22 @@
-
-# Simple web server using Elm
+# Simple web server using Elm 0.17
 
 ## Usage
+
+Install node dependencies
+
+    npm install
+
+Run server
 
     ./run.sh
 
 
-What does it do?
+## What does it do?
 
-* build server side application
-* start node server for request forwarding to Elm code
+* builds server side application
+* starts node server for request forwarding to Elm code
 
-## Features
+## Interesting features
 
-* Server side http request for additional data. Response is provided after collecting this additional data.
-* Capable of serving many clients concurrently
+* Server is able to process additional http requests (and generally all ```Tasks```) asynchronously before generating response.
+* Capable of serving many clients concurrently.
