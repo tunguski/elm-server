@@ -1,5 +1,7 @@
 # Simple web server using Elm 0.17
 
+[![Build Status](https://travis-ci.org/tunguski/elm-server.svg?branch=master)](https://travis-ci.org/tunguski/elm-server)
+
 ## Usage
 
 Install node dependencies
