@@ -8,7 +8,7 @@ node_js:
 
 before_script:
   - npm install
-  - ./run.sh &
+  - yes | run.sh &
 
 script:
   - for i in $(seq 1 1000); do curl -s http://localhost:8080 > "$i.log" & done
