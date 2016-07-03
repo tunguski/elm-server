@@ -3,14 +3,20 @@ port module Server exposing (..)
 import Html exposing (..)
 import Html.App as Html
 import String
+import Maybe 
 import Dict exposing (Dict, empty)
 
 
-main =
+type alias Initializer msg = Request -> (Response, List (Cmd msg))
+type alias Updater msg = Request -> msg -> Response -> (Response, List (Cmd msg))
+
+
+program : Initializer msg -> Updater msg -> Program Never
+program initializer updater =
   Html.program
-    { init = (Model empty, Cmd.none)
+    { init = (empty, Cmd.none) 
     , view = view
-    , update = update
+    , update = update initializer updater
     , subscriptions = subscriptions
     }
 
@@ -18,39 +24,67 @@ main =
 -- MODEL
 
 
-type alias Processing =
+type alias Processing msg =
   { request : Request
   , response : Response
-  , queue : List (Cmd Msg)
+  , queue : List (Cmd msg)
   }
 
 
-type alias Model =
-  { processing : Dict String Processing
-  }
+type alias Model msg = Dict String (Processing msg)
 
 
 -- UPDATE
 
 
-type Msg
+type Msg msg
   = IncomingRequest Request 
+  | InternalMsg String msg
 
 
 port sendResponse : Response -> Cmd msg
 
 
-update : Msg -> Model -> (Model, Cmd Msg)
-update msg model =
+update : Initializer m 
+          -> Updater m 
+          -> Msg m 
+          -> Model m 
+          -> (Model m, Cmd (Msg m))
+update initializer updater msg model =
   case msg of
     IncomingRequest request ->
-     { model |
-        processing = Dict.insert request.id 
-          (Processing request (Response request.id 200 "") [])
-          model.processing
-      } ! [ sendResponse 
-            <| Response request.id 200 
-            <| String.concat [ "Request ", request.url ] ]
+      let
+        (response, cmds) = initializer request
+      in
+        if List.isEmpty cmds
+        then
+          model
+          ! [ sendResponse response ] 
+        else
+          Dict.insert request.id 
+            (Processing request response cmds)
+            model
+          -- FIXME: map cmds to Server.Msg
+          ! (List.map (\s -> Cmd.map (InternalMsg request.id) s) cmds)
+    InternalMsg text internalMessage ->
+      case Dict.get text model of
+        Just processing ->
+          let
+            (response, cmds) = updater processing.request internalMessage processing.response 
+          in
+            if List.isEmpty cmds
+            then
+              Dict.remove processing.request.id model
+              ! [ sendResponse response ] 
+            else
+              Dict.insert processing.request.id 
+                (Processing processing.request response cmds)
+                model
+              -- FIXME: map cmds to Server.Msg
+              ! (List.map (\s -> Cmd.map (InternalMsg processing.request.id) s) cmds)
+        Nothing ->
+          model ! []
+
 
 
 -- SUBSCRIPTIONS
@@ -73,14 +107,14 @@ type alias Response =
 port request : (Request -> msg) -> Sub msg
 
 
-subscriptions : Model -> Sub Msg
+subscriptions : Model msg -> Sub (Msg msg)
 subscriptions model =
   request IncomingRequest 
 
 
 -- VIEW
 
-view : Model -> Html Msg
+view : Model msg -> Html (Msg msg)
 view model = text "Use the API Luke!"
 
 

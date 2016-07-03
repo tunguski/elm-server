@@ -16,6 +16,7 @@
         "elm-lang/navigation": "1.0.0 <= v < 2.0.0",
         "elm-community/list-extra": "2.0.0 <= v < 3.0.0",
         "evancz/elm-markdown": "3.0.0 <= v < 4.0.0",
+        "evancz/elm-http": "3.0.0 <= v < 4.0.0",
         "ohanhi/keyboard-extra": "1.0.0 <= v < 2.0.0",
         "mdgriffith/elm-style-animation": "1.0.0 <= v < 2.0.0"
     },

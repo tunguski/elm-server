@@ -1,8 +1,10 @@
 const http = require('http');
 const elm = require('./main');
 
+global.XMLHttpRequest = require("xhr2");
 
-var app = elm.Server.worker();
+
+var app = elm.Example.worker();
 
 // TODO: switch to redis
 var requestCache = {};

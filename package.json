@@ -4,8 +4,11 @@
   "description": "",
   "main": "server.js",
   "dependencies": {
+    "xhr2": "^0.1.3"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "elm": "^0.17.1"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
