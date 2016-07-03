@@ -9,17 +9,10 @@ node_js:
 before_script:
   - npm install
   - ./run.sh &
-  #  - export DISPLAY=:99.0
-  #  - sh -e /etc/init.d/xvfb start
-  #  - gem update --system
-  #  - gem install sass --version ">=3.3.7"
-  #  - gem install compass --version ">=0.12.3"
-  #  - npm install --quiet -g grunt-cli karma
-  #  - npm install
-  #  - npm install -g bower
-  #  - bower install -f
 
 script:
-  - for i in $(seq 1 10000); do curl http://localhost:8080 > out.log & done
+  - for i in $(seq 1 1000); do curl -s http://localhost:8080 > "$i.log" & done
+  - sleep 10
+  - for i in $(seq 1 1000); do grep -Fxq "/$i" "$i.log" || ( echo "File $i.log contains improper data"; cat "$i.log"; ) ; done
 notifications:
     email: false
