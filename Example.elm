@@ -28,19 +28,16 @@ type Msg
 
 init : Initializer Msg 
 init request =
-  (Response request.id 200 
-    <| String.concat [ "Example request mirroring of: ", request.url ]
-  , [ fetchData ]
-  )
+  ( Response request.id 200 "", [ fetchData ] )
 
 
 update : Updater Msg 
 update request msg response =
   case msg of
     DataFetched text ->
-      ({ response | body = String.concat [ response.body, "\n\n", toString text ] }, [])
+      ({ response | body = request.url }, [])
     ErrorOccurred text ->
-      (response, [])
+      ({ response | body = text }, [])
 
 
 type alias RepoInfo =

@@ -59,7 +59,7 @@ update initializer updater msg model =
         if List.isEmpty cmds
         then
           model
-          ! [ sendResponse response ] 
+          ! [ sendResponse response ]
         else
           Dict.insert request.id 
             (Processing request response cmds)
@@ -75,7 +75,7 @@ update initializer updater msg model =
             if List.isEmpty cmds
             then
               Dict.remove processing.request.id model
-              ! [ sendResponse response ] 
+              ! [ sendResponse response ]
             else
               Dict.insert processing.request.id 
                 (Processing processing.request response cmds)
