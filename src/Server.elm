@@ -3,7 +3,7 @@ port module Server exposing (..)
 import Html exposing (..)
 import Html.App as Html
 import String
-import Maybe 
+import Maybe
 import Dict exposing (Dict, empty)
 
 
@@ -14,7 +14,7 @@ type alias Updater msg = Request -> msg -> Response -> (Response, List (Cmd msg)
 program : Initializer msg -> Updater msg -> Program Never
 program initializer updater =
   Html.program
-    { init = (empty, Cmd.none) 
+    { init = (empty, Cmd.none)
     , view = view
     , update = update initializer updater
     , subscriptions = subscriptions
@@ -38,17 +38,17 @@ type alias Model msg = Dict String (Processing msg)
 
 
 type Msg msg
-  = IncomingRequest Request 
+  = IncomingRequest Request
   | InternalMsg String msg
 
 
 port sendResponse : Response -> Cmd msg
 
 
-update : Initializer m 
-          -> Updater m 
-          -> Msg m 
-          -> Model m 
+update : Initializer m
+          -> Updater m
+          -> Msg m
+          -> Model m
           -> (Model m, Cmd (Msg m))
 update initializer updater msg model =
   case msg of
@@ -61,23 +61,23 @@ update initializer updater msg model =
           model
           ! [ sendResponse response ]
         else
-          Dict.insert request.id 
+          Dict.insert request.id
             (Processing request response cmds)
             model
           -- FIXME: map cmds to Server.Msg
           ! (List.map (\s -> Cmd.map (InternalMsg request.id) s) cmds)
-    InternalMsg text internalMessage ->
-      case Dict.get text model of
+    InternalMsg idRequest internalMessage ->
+      case Dict.get idRequest model of
         Just processing ->
           let
-            (response, cmds) = updater processing.request internalMessage processing.response 
+            (response, cmds) = updater processing.request internalMessage processing.response
           in
             if List.isEmpty cmds
             then
               Dict.remove processing.request.id model
               ! [ sendResponse response ]
             else
-              Dict.insert processing.request.id 
+              Dict.insert processing.request.id
                 (Processing processing.request response cmds)
                 model
               -- FIXME: map cmds to Server.Msg
@@ -109,7 +109,7 @@ port request : (Request -> msg) -> Sub msg
 
 subscriptions : Model msg -> Sub (Msg msg)
 subscriptions model =
-  request IncomingRequest 
+  request IncomingRequest
 
 
 -- VIEW

@@ -1,1 +1,1 @@
-elm-make Example.elm --output main.js && node server.js
+elm-make example/Example.elm --output main.js && node server.js
