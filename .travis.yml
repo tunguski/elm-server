@@ -9,7 +9,7 @@ node_js:
 before_script:
   - npm install
   - yes | elm-make Example.elm --output main.js 
-  - ./run.sh &
+  - node server.js &
   - sleep 2 
 
 script:
