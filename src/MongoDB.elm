@@ -14,13 +14,13 @@ listDocuments baseUrl decoder msg collection =
     (concat [ baseUrl, collection ])
     |> Task.mapError toString
     |> Task.perform 
-        (ErrorOccurred)
-        (\data -> DataFetched (msg data))
+        ErrorOccurred
+        (DataFetched << msg)
 
 
-getDatabaseDescription : String -> (item -> m) -> Cmd (DbMsg m)
-getDatabaseDescription baseUrl msg =
-  listDocuments baseUrl mongoDbDecoder msg ""
+--getDatabaseDescription : String -> (item -> m) -> Cmd (DbMsg m)
+--getDatabaseDescription baseUrl msg =
+--  listDocuments baseUrl mongoDbDecoder msg ""
 
 
 type DbMsg msg
@@ -65,7 +65,7 @@ mongoDbDecoder =
 
 type alias Collection item =
   { name : String
-  , description : String
+  , description : Maybe String
   , elements : List item
   }
 
@@ -74,7 +74,7 @@ collectionDecoder : Decoder item -> Decoder (Collection item)
 collectionDecoder itemDecoder =
   Json.object3 Collection 
     ("_id" := Json.string) 
-    ("desc" := Json.string) 
+    (maybe ("desc" := Json.string))
     (at ["_embedded", "rh:doc"] <| Json.list itemDecoder)
 
 

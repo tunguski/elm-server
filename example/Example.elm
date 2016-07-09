@@ -1,17 +1,13 @@
 module Example exposing (..)
 
 
-import Html exposing (..)
-import Html.App as Html
-import String exposing (concat)
 import Http
 import Json.Decode as Json exposing ((:=))
 import Task
 import Debug
-import Dict exposing (Dict, empty)
 
 
-import Server exposing (..)
+import Server
 import MongoDB exposing (..)
 
 
@@ -24,10 +20,11 @@ main =
 
 type Requests
   = GetDb MongoDb
-  | GetColl (List RepoInfo)
+  | GetColl (Collection RepoInfo)
 
 
-type alias Msg = DbMsg Requests
+type alias Msg 
+  = DbMsg Requests
 
 
 db = "http://admin:changeit@localhost:8888/testdb/"
@@ -38,7 +35,6 @@ initResponse request =
   ( Response request.id 200 "", [ request ] )
 
 
-
 init : Initializer Msg
 init request =
     case request.url of
@@ -46,7 +42,8 @@ init request =
         initResponse getResponseInfos
 
       _ ->
-        initResponse <| getDatabaseDescription db GetDb
+        initResponse getResponseInfos
+        --initResponse <| getDatabaseDescription db GetDb
 
 
 update : Updater Msg
@@ -54,7 +51,7 @@ update request msg response =
   case msg of
     DataFetched reqType ->
       ({ response
-         | body = concat [ request.url, "\n", toString repositories ] }, [])
+         | body = toString repositories }, [])
 
     ErrorOccurred reqType text ->
       ({ response 
@@ -79,7 +76,7 @@ getRepoInfos : Cmd (DbMsg Requests)
 getRepoInfos =
   listDocuments
     db 
-    (Json.list repoInfoDecoder)
+    repoInfoDecoder
     GetColl
     "coll"
 
