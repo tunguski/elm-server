@@ -17,12 +17,12 @@ get baseUrl decoder msg collection =
         (DataFetched << msg)
 
 
---listDocuments : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+listDocuments : String -> (Json.Decoder item) -> (Collection item -> m) -> String -> Cmd (DbMsg m)
 listDocuments baseUrl decoder msg collection =
   get baseUrl (collectionDecoder decoder) msg collection
 
 
---getDatabaseDescription : String -> (item -> m) -> Cmd (DbMsg m)
+getDatabaseDescription : String -> (MongoDb -> m) -> Cmd (DbMsg m)
 getDatabaseDescription baseUrl msg =
   get baseUrl mongoDbDecoder msg ""
 
