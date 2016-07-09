@@ -53,7 +53,7 @@ Run server
 
 ## Writing server side application
 
-Start with reading [example/Example.elm]().
+Start with reading [example/Example.elm](example/Example.elm).
 
 Server side Elm application consists of two functions:
 
