@@ -4,9 +4,13 @@ node_js:
   - "6.1"
   - "5.11"
 
+cache:
+  directories:
+    - elm-stuff/build-artifacts
+
 before_script:
   - npm install
-  - yes | elm-make example/Example.elm --output main.js 
+  - elm-make --yes example/Example.elm --output main.js 
   - node server.js &
   - sleep 2 
 
