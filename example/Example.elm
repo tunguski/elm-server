@@ -2,12 +2,12 @@ module Example exposing (..)
 
 
 import Http
-import Json.Decode as Json exposing ((:=))
+import Json.Decode as Json exposing (..)
 import Task
 import Debug
 
 
-import Server
+import Server exposing (..)
 import MongoDB exposing (..)
 
 
@@ -30,30 +30,41 @@ type alias Msg
 db = "http://admin:changeit@localhost:8888/testdb/"
 
 
-initResponse : Cmd Msg -> (Response, List (Cmd Msg))
-initResponse request =
-  ( Response request.id 200 "", [ request ] )
+initResponse : Request -> Cmd Msg -> (Response, List (Cmd Msg))
+initResponse request query =
+  ( Response request.id 200 "", [ query ] )
 
 
 init : Initializer Msg
 init request =
+  let
+    x = Debug.log "Request: " request
+  in
     case request.url of
-      "" ->
-        initResponse getResponseInfos
+      "/" ->
+        initResponse request getRepoInfos 
+
+      "/db" ->
+        initResponse request <| getDatabaseDescription db GetDb
 
       _ ->
-        initResponse getResponseInfos
-        --initResponse <| getDatabaseDescription db GetDb
+        ( Response request.id 404 "", [] )
 
 
 update : Updater Msg
 update request msg response =
   case msg of
     DataFetched reqType ->
-      ({ response
-         | body = toString repositories }, [])
+      case reqType of
+        GetDb mongoDb ->
+          ({ response
+             | body = toString mongoDb }, [])
 
-    ErrorOccurred reqType text ->
+        GetColl repositories ->
+          ({ response
+             | body = toString repositories }, [])
+
+    ErrorOccurred text ->
       ({ response 
           | statusCode = 500
           , body = Debug.log "Error" text }, [])
@@ -68,8 +79,8 @@ type alias RepoInfo =
 repoInfoDecoder : Json.Decoder RepoInfo
 repoInfoDecoder =
   Json.object2 RepoInfo 
-    (Json.at ["_id" ] <| "$oid" := Json.string)
-    ("name" := Json.string)
+    (at ["_id" ] <| "$oid" := string)
+    ("name" := string)
 
 
 getRepoInfos : Cmd (DbMsg Requests)

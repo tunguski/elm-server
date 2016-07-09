@@ -2,15 +2,14 @@ module MongoDB exposing (..)
 
 
 import Http exposing (..)
-import Task exposing (..)
-import Json.Decode exposing (..)
-import Json.Decode as Json exposing ((:=))
+import Task
+import Json.Decode as Json exposing (..)
 import String exposing (concat)
 
 
-listDocuments : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
-listDocuments baseUrl decoder msg collection =
-  Http.get (collectionDecoder decoder) 
+get : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+get baseUrl decoder msg collection =
+  Http.get decoder
     (concat [ baseUrl, collection ])
     |> Task.mapError toString
     |> Task.perform 
@@ -18,9 +17,14 @@ listDocuments baseUrl decoder msg collection =
         (DataFetched << msg)
 
 
+--listDocuments : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+listDocuments baseUrl decoder msg collection =
+  get baseUrl (collectionDecoder decoder) msg collection
+
+
 --getDatabaseDescription : String -> (item -> m) -> Cmd (DbMsg m)
---getDatabaseDescription baseUrl msg =
---  listDocuments baseUrl mongoDbDecoder msg ""
+getDatabaseDescription baseUrl msg =
+  get baseUrl mongoDbDecoder msg ""
 
 
 type DbMsg msg
