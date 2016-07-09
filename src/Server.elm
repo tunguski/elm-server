@@ -24,6 +24,20 @@ program initializer updater =
 -- MODEL
 
 
+type alias Request =
+  { id : String
+  , url : String
+  , method : String
+  }
+
+
+type alias Response =
+  { idRequest : String
+  , statusCode : Int
+  , body : String
+  }
+
+
 type alias Processing msg =
   { request : Request
   , response : Response
@@ -64,7 +78,6 @@ update initializer updater msg model =
           Dict.insert request.id
             (Processing request response cmds)
             model
-          -- FIXME: map cmds to Server.Msg
           ! (List.map (\s -> Cmd.map (InternalMsg request.id) s) cmds)
     InternalMsg idRequest internalMessage ->
       case Dict.get idRequest model of
@@ -80,31 +93,15 @@ update initializer updater msg model =
               Dict.insert processing.request.id
                 (Processing processing.request response cmds)
                 model
-              -- FIXME: map cmds to Server.Msg
               ! (List.map (\s -> Cmd.map (InternalMsg processing.request.id) s) cmds)
         Nothing ->
           model ! []
 
 
+port request : (Request -> msg) -> Sub msg
+
 
 -- SUBSCRIPTIONS
-
-
-type alias Request =
-  { id : String
-  , url : String
-  , method : String
-  }
-
-
-type alias Response =
-  { idRequest : String
-  , statusCode : Int
-  , body : String
-  }
-
-
-port request : (Request -> msg) -> Sub msg
 
 
 subscriptions : Model msg -> Sub (Msg msg)
