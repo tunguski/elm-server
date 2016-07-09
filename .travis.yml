@@ -8,7 +8,7 @@ node_js:
 
 before_script:
   - npm install
-  - yes | elm-make Example.elm --output main.js 
+  - yes | elm-make example/Example.elm --output main.js 
   - node server.js &
   - sleep 2 
 

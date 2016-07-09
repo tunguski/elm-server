@@ -18,49 +18,70 @@ import MongoDB exposing (..)
 main =
   Server.program init update
 
-db = database "http://localhost:8888/"
+
+db = database httpRest "http://localhost:8888/"
+rest = httpRest
+
 
 -- UPDATE
 
 
-type Msg
-  = DataFetched (List RepoInfo)
-  | ErrorOccurred String
+type Msg item
+  = DataFetched Requests item
+  | ErrorOccurred Requests String
 
 
-init : Initializer Msg
+type Requests
+  = GetDb
+  | GetColl
+
+
+init : Initializer (Msg (Collection RepoInfo))
 init request =
-  ( Response request.id 200 "", [ fetchData ] )
+  ( Response request.id 200 "", [ listDocuments "coll" ] )
 
 
-update : Updater Msg
+update : Updater (Msg item)
 update request msg response =
   case msg of
-    DataFetched repositories ->
+    DataFetched reqType repositories ->
       ({ response
          | body = concat [ request.url, "\n", toString repositories, "\n\n", db.get request.url ] }, [])
-    ErrorOccurred text ->
-      ({ response | body = text }, [])
+    ErrorOccurred reqType text ->
+      ({ response | body = Debug.log "Error" text }, [])
 
 
 type alias RepoInfo =
-  { id : Int
-  , name : String
+  { name : String
+--  , id : Int
   }
+
 
 repoInfoDecoder : Json.Decoder RepoInfo
 repoInfoDecoder =
-  Json.object2 RepoInfo ("id" := Json.int) ("name" := Json.string)
+  Json.object1 RepoInfo 
+--    ("id" := Json.int) 
+    ("name" := Json.string)
 
 
-repoInfoListDecoder : Json.Decoder (List RepoInfo)
-repoInfoListDecoder =
-  Json.list repoInfoDecoder
-
-
-fetchData : Cmd Msg
-fetchData =
-  Http.get repoInfoListDecoder "https://api.github.com/users/nytimes/repos"
+getDatabaseDescription : Cmd (Msg MongoDb)
+getDatabaseDescription =
+  rest.get mongoDbDecoder 
+    "http://admin:changeit@localhost:8888/testdb"
     |> Task.mapError toString
-    |> Task.perform ErrorOccurred DataFetched
+    |> Task.perform (ErrorOccurred GetDb) (DataFetched GetDb)
+
+
+
+listDocuments : String -> Cmd (Msg (Collection RepoInfo))
+listDocuments collection =
+  rest.get (collectionDecoder repoInfoDecoder) 
+    (concat 
+      [ "http://admin:changeit@localhost:8888/testdb/"
+      , collection 
+      ])
+    |> Task.mapError toString
+    |> Task.perform (ErrorOccurred GetColl) (DataFetched GetColl)
+
+
 
