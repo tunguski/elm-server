@@ -62,9 +62,9 @@ type alias MongoDb =
 mongoDbDecoder : Decoder MongoDb
 mongoDbDecoder =
   Json.object3 MongoDb 
-    ("_id" := Json.string) 
+    ("_id" := Json.string)
     (maybe ("desc" := Json.string))
-    (at ["_embedded", "rh:coll"] <| (Json.list Json.string))
+    (at ["_embedded", "rh:coll"] <| (Json.list ("_id" := Json.string)))
 
 
 type alias Collection item =
