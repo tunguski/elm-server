@@ -8,65 +8,59 @@ import Json.Decode as Json exposing ((:=))
 import String exposing (concat)
 
 
-type alias RestBackend value =
-  { get     : Decoder value -> String -> Task Error value
-  , post    : Decoder value -> String -> Body -> Task Error value
-  , put     : Decoder value -> String -> Body -> Task Error value
-  , delete  : Decoder value -> String -> Task Error value
-  }
+listDocuments : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+listDocuments baseUrl decoder msg collection =
+  Http.get (collectionDecoder decoder) 
+    (concat [ baseUrl, collection ])
+    |> Task.mapError toString
+    |> Task.perform 
+        (ErrorOccurred)
+        (\data -> DataFetched (msg data))
 
 
-type alias MongoDbApi =
-  { create : String -> String
-  , find : String -> String
-  , get : String -> String
-  , getById : String -> String
-  }
+getDatabaseDescription : String -> (item -> m) -> Cmd (DbMsg m)
+getDatabaseDescription baseUrl msg =
+  listDocuments baseUrl mongoDbDecoder msg ""
 
 
-httpRest : RestBackend value
-httpRest = RestBackend
-  Http.get
-  Http.post
-  (\decoder url body ->
+type DbMsg msg
+  = DataFetched msg
+  | ErrorOccurred String
+
+
+put decoder url body =
    fromJson decoder <|
    Http.send defaultSettings
     { verb = "PUT"
     , headers = []
     , url = url
     , body = body
-    })
-  (\decoder url ->
+    }
+
+
+delete decoder url =
    fromJson decoder <|
    Http.send defaultSettings
     { verb = "DELETE"
     , headers = []
     , url = url
     , body = empty
-    })
-
-
-
-database : RestBackend value -> String -> MongoDbApi
-database rest url =
-  { get = (\s -> concat [ url, s ])
-  , getById = (\s -> concat [ url, s ])
-  , find = (\s -> concat [ url, s ])
-  , create = (\s -> concat [ url, s ])
-  }
+    }
 
 
 type alias MongoDb =
   { name : String
   , description : Maybe String
+  , collections : List String
   }
 
 
 mongoDbDecoder : Decoder MongoDb
 mongoDbDecoder =
-  Json.object2 MongoDb 
+  Json.object3 MongoDb 
     ("_id" := Json.string) 
     (maybe ("desc" := Json.string))
+    (at ["_embedded", "rh:coll"] <| (Json.list Json.string))
 
 
 type alias Collection item =
