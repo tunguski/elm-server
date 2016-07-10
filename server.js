@@ -13,6 +13,10 @@ var requestCache = {};
 app.ports.sendResponse.subscribe(function(response) {
   var reqRes = requestCache[response.idRequest];
   if (reqRes) {
+    response.headers.forEach(function (header) {
+      reqRes.res.setHeader(header[0], header[1]);
+    });
+
     if (response.statusCode) {
       reqRes.res.statusCode = response.statusCode;
     }
@@ -29,8 +33,25 @@ app.ports.sendResponse.subscribe(function(response) {
 
 const server = http.createServer((req, res) => {
   var id = '' + Math.random();
-  requestCache[id] = { req : req, res : res, startTime : new Date().getTime() };
-  app.ports.request.send({ id : id, url : req.url, method : req.method });
+  requestCache[id] = { 
+    req : req, 
+    res : res, 
+    startTime : new Date().getTime() 
+  };
+
+  var headers = [];
+  req.headers
+
+  for(var header in req.headers) {
+    headers.push([ header, req.headers[header] ]);
+  }
+
+  app.ports.request.send({ 
+    id : id, 
+    url : req.url, 
+    headers : headers,
+    method : req.method 
+  });
 });
 
 

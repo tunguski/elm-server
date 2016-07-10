@@ -1,14 +1,15 @@
 module Example exposing (..)
 
 
-import Http
+import Http exposing (Error(..))
 import Json.Decode as Json exposing (..)
 import Task
 import Debug
 
 
+import MongoDb exposing (..)
 import Server exposing (..)
-import MongoDB exposing (..)
+import Session exposing (..)
 
 
 main =
@@ -21,53 +22,86 @@ main =
 type Requests
   = GetDb MongoDb
   | GetColl (Collection RepoInfo)
+  | GetSession Session 
 
 
 type alias Msg 
   = DbMsg Requests
 
 
+type alias State =
+  { session : Maybe Session
+  , data : Maybe String
+  }
+
+
+type alias StateUpdater = Server.StateUpdater Msg State 
+
+
 db = "http://admin:changeit@localhost:8888/testdb/"
 
 
-initResponse : Request -> Cmd Msg -> (Response, List (Cmd Msg))
-initResponse request query =
-  ( Response request.id 200 "", [ query ] )
+initResponseTuple : Request -> Cmd Msg -> Server.State Msg State 
+initResponseTuple request query =
+  ( (Server.initResponse request.id, State Nothing Nothing ), [ query ] )
 
 
-init : Initializer Msg
+init : Initializer Msg State
 init request =
-  let
-    x = Debug.log "Request: " request
-  in
     case request.url of
       "/" ->
-        initResponse request getRepoInfos 
+        initResponseTuple request getRepoInfos 
 
-      "/db" ->
-        initResponse request <| getDatabaseDescription db GetDb
+      "/session" ->
+        initResponseTuple request getSession
+
+      "/testDb" ->
+        initResponseTuple request <| getDatabaseDescription db GetDb
 
       _ ->
-        ( Response request.id 404 "", [] )
+        let
+          x = Debug.log "Not found" request.url
+        in
+          ( ( initResponseStatus request.id 404, State Nothing Nothing), [] )
 
 
-update : Updater Msg
-update request msg response =
-  case msg of
-    DataFetched reqType ->
-      case reqType of
-        GetDb mongoDb ->
-          ({ response
-             | body = toString mongoDb }, [])
+updateBody : String -> StateUpdater 
+updateBody body ((response, state), cmds) =
+  (({ response | body = body }, state), [])
 
-        GetColl repositories ->
-          ({ response
-             | body = toString repositories }, [])
 
-    ErrorOccurred text ->
-      ({ response 
-          | statusCode = 500
-          , body = Debug.log "Error" text }, [])
+updateStatus : Int -> StateUpdater 
+updateStatus statusCode ((response, state), cmds) =
+  (({ response | statusCode = statusCode }, state), [])
+
+
+update : Updater Msg State
+update request msg (response, state) =
+  let
+    st = ((response, state), [])
+  in
+    case msg of
+      DataFetched reqType ->
+        case reqType of
+          GetDb mongoDb ->
+            updateBody (toString mongoDb) st 
+  
+          GetColl repositories ->
+            updateBody (toString repositories) st 
+  
+          GetSession session ->
+            updateBody (toString session) st 
+  
+      ErrorOccurred error ->
+        case Debug.log "Http.Error" error of
+          Timeout ->
+            updateStatus 500 st 
+          NetworkError ->
+            updateStatus 500 st 
+          UnexpectedPayload payload ->
+            updateStatus 500 >> updateBody payload <| st 
+          BadResponse statusCode body ->
+            updateStatus statusCode >> updateBody body <| st 
 
 
 type alias RepoInfo =
@@ -83,12 +117,21 @@ repoInfoDecoder =
     ("name" := string)
 
 
+get : (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+get = MongoDb.get db
+
+
+listDocuments : (Json.Decoder item) -> (Collection item -> m) -> String -> Cmd (DbMsg m)
+listDocuments = MongoDb.listDocuments db
+
+
 getRepoInfos : Cmd (DbMsg Requests)
 getRepoInfos =
-  listDocuments
-    db 
-    repoInfoDecoder
-    GetColl
-    "coll"
+  listDocuments repoInfoDecoder GetColl "coll"
+
+
+getSession : Cmd (DbMsg Requests)
+getSession =
+  get sessionDecoder GetSession "session"
 
 

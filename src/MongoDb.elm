@@ -1,8 +1,8 @@
-module MongoDB exposing (..)
+module MongoDb exposing (..)
 
 
 import Http exposing (..)
-import Task
+import Task exposing (Task)
 import Json.Decode as Json exposing (..)
 import String exposing (concat)
 
@@ -11,7 +11,6 @@ get : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
 get baseUrl decoder msg collection =
   Http.get decoder
     (concat [ baseUrl, collection ])
-    |> Task.mapError toString
     |> Task.perform 
         ErrorOccurred
         (DataFetched << msg)
@@ -29,7 +28,7 @@ getDatabaseDescription baseUrl msg =
 
 type DbMsg msg
   = DataFetched msg
-  | ErrorOccurred String
+  | ErrorOccurred Http.Error
 
 
 put decoder url body =

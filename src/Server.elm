@@ -7,11 +7,13 @@ import Maybe
 import Dict exposing (Dict, empty)
 
 
-type alias Initializer msg = Request -> (Response, List (Cmd msg))
-type alias Updater msg = Request -> msg -> Response -> (Response, List (Cmd msg))
+type alias State msg state = ((Response, state), List (Cmd msg))
+type alias Initializer msg state = Request -> State msg state 
+type alias Updater msg state = Request -> msg -> (Response, state) -> State msg state 
+type alias StateUpdater msg state = State msg state -> State msg state 
 
 
-program : Initializer msg -> Updater msg -> Program Never
+program : Initializer msg state -> Updater msg state -> Program Never
 program initializer updater =
   Html.program
     { init = (empty, Cmd.none)
@@ -26,6 +28,7 @@ program initializer updater =
 
 type alias Request =
   { id : String
+  , headers : List (String, String) 
   , url : String
   , method : String
   }
@@ -33,19 +36,29 @@ type alias Request =
 
 type alias Response =
   { idRequest : String
+  , headers : List (String, String) 
   , statusCode : Int
   , body : String
   }
 
 
-type alias Processing msg =
+initResponseStatus idRequest statusCode =
+  Response idRequest [("Server", "Tunguski's Elm-Server")] statusCode ""
+
+
+initResponse idRequest =
+  initResponseStatus idRequest 200
+
+
+type alias Processing msg state =
   { request : Request
-  , response : Response
+  , response : (Response, state)
   , queue : List (Cmd msg)
   }
 
 
-type alias Model msg = Dict String (Processing msg)
+type alias Model msg state 
+  = Dict String (Processing msg state)
 
 
 -- UPDATE
@@ -59,16 +72,16 @@ type Msg msg
 port sendResponse : Response -> Cmd msg
 
 
-update : Initializer m
-          -> Updater m
+update : Initializer m state
+          -> Updater m state
           -> Msg m
-          -> Model m
-          -> (Model m, Cmd (Msg m))
+          -> Model m state
+          -> (Model m state, Cmd (Msg m))
 update initializer updater msg model =
   case msg of
     IncomingRequest request ->
       let
-        (response, cmds) = initializer request
+        ((response, st), cmds) = initializer request
       in
         if List.isEmpty cmds
         then
@@ -76,14 +89,15 @@ update initializer updater msg model =
           ! [ sendResponse response ]
         else
           Dict.insert request.id
-            (Processing request response cmds)
+            (Processing request (response, st) cmds)
             model
           ! (List.map (\s -> Cmd.map (InternalMsg request.id) s) cmds)
     InternalMsg idRequest internalMessage ->
       case Dict.get idRequest model of
         Just processing ->
           let
-            (response, cmds) = updater processing.request internalMessage processing.response
+            ((response, st), cmds) =
+             updater processing.request internalMessage processing.response
           in
             if List.isEmpty cmds
             then
@@ -91,7 +105,7 @@ update initializer updater msg model =
               ! [ sendResponse response ]
             else
               Dict.insert processing.request.id
-                (Processing processing.request response cmds)
+                (Processing processing.request (response, st) cmds)
                 model
               ! (List.map (\s -> Cmd.map (InternalMsg processing.request.id) s) cmds)
         Nothing ->
@@ -104,14 +118,14 @@ port request : (Request -> msg) -> Sub msg
 -- SUBSCRIPTIONS
 
 
-subscriptions : Model msg -> Sub (Msg msg)
+subscriptions : Model msg state -> Sub (Msg msg)
 subscriptions model =
   request IncomingRequest
 
 
 -- VIEW
 
-view : Model msg -> Html (Msg msg)
+view : Model msg state -> Html (Msg msg)
 view model = text "Use the API Luke!"
 
 
