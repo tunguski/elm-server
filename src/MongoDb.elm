@@ -5,23 +5,23 @@ import Http exposing (..)
 import Task exposing (Task)
 import Json.Decode as Json exposing (..)
 import String exposing (concat)
+import Platform.Cmd as Cmd
 
 
-get : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+get : String -> (Json.Decoder item) -> (DbMsg item -> m) -> String -> Cmd m
 get baseUrl decoder msg collection =
   Http.get decoder
     (concat [ baseUrl, collection ])
-    |> Task.perform 
-        ErrorOccurred
-        (DataFetched << msg)
+    |> Task.perform ErrorOccurred DataFetched
+    |> Cmd.map msg
 
 
-listDocuments : String -> (Json.Decoder item) -> (Collection item -> m) -> String -> Cmd (DbMsg m)
+listDocuments : String -> (Json.Decoder item) -> (DbMsg (Collection item) -> m) -> String -> Cmd m
 listDocuments baseUrl decoder msg collection =
   get baseUrl (collectionDecoder decoder) msg collection
 
 
-getDatabaseDescription : String -> (MongoDb -> m) -> Cmd (DbMsg m)
+getDatabaseDescription : String -> (DbMsg MongoDb -> m) -> Cmd m
 getDatabaseDescription baseUrl msg =
   get baseUrl mongoDbDecoder msg ""
 

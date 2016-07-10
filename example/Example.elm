@@ -19,14 +19,10 @@ main =
 -- UPDATE
 
 
-type Requests
-  = GetDb MongoDb
-  | GetColl (Collection RepoInfo)
-  | GetSession Session 
-
-
-type alias Msg 
-  = DbMsg Requests
+type Msg 
+  = GetDb (DbMsg MongoDb)
+  | GetColl (DbMsg (Collection RepoInfo))
+  | GetSession (DbMsg Session)
 
 
 type alias State =
@@ -35,13 +31,16 @@ type alias State =
   }
 
 
+type alias ServerState = Server.State Msg State
+
+
 type alias StateUpdater = Server.StateUpdater Msg State 
 
 
 db = "http://admin:changeit@localhost:8888/testdb/"
 
 
-initResponseTuple : Request -> Cmd Msg -> Server.State Msg State 
+initResponseTuple : Request -> Cmd Msg -> ServerState 
 initResponseTuple request query =
   ( (Server.initResponse request.id, State Nothing Nothing ), [ query ] )
 
@@ -60,48 +59,55 @@ init request =
 
       _ ->
         let
-          x = Debug.log "Not found" request.url
+          debugLog = Debug.log "Not found" request.url
         in
           ( ( initResponseStatus request.id 404, State Nothing Nothing), [] )
 
 
-updateBody : String -> StateUpdater 
-updateBody body ((response, state), cmds) =
-  (({ response | body = body }, state), [])
+updateBody : (data -> String) -> data -> StateUpdater 
+updateBody getter data =
+  (\((response, state), cmds) ->
+    (({ response | body = getter data }, state), []))
 
 
-updateStatus : Int -> StateUpdater 
-updateStatus statusCode ((response, state), cmds) =
-  (({ response | statusCode = statusCode }, state), [])
+updateStatus : (data -> Int) -> data -> StateUpdater 
+updateStatus getter data = 
+  (\((response, state), cmds) ->
+    (({ response | statusCode = getter data }, state), []))
+
+
+errorProcessor : ServerState -> DbMsg a -> (a -> StateUpdater) -> ServerState 
+errorProcessor st msg fn =
+  case msg of
+    DataFetched data ->
+      (fn data) st
+    ErrorOccurred error ->
+      case Debug.log "Http.Error" error of
+        Timeout ->
+          updateStatus (always 500) () st
+        NetworkError ->
+          updateStatus (always 500) () st
+        UnexpectedPayload payload ->
+          (updateStatus (always 500) >> updateBody (always payload)) () st 
+        BadResponse statusCode body ->
+          (updateStatus (always statusCode) >> updateBody (always body)) () st 
 
 
 update : Updater Msg State
 update request msg (response, state) =
   let
     st = ((response, state), [])
+    process = errorProcessor st
   in
     case msg of
-      DataFetched reqType ->
-        case reqType of
-          GetDb mongoDb ->
-            updateBody (toString mongoDb) st 
-  
-          GetColl repositories ->
-            updateBody (toString repositories) st 
-  
-          GetSession session ->
-            updateBody (toString session) st 
-  
-      ErrorOccurred error ->
-        case Debug.log "Http.Error" error of
-          Timeout ->
-            updateStatus 500 st 
-          NetworkError ->
-            updateStatus 500 st 
-          UnexpectedPayload payload ->
-            updateStatus 500 >> updateBody payload <| st 
-          BadResponse statusCode body ->
-            updateStatus statusCode >> updateBody body <| st 
+      GetDb dbMsg ->
+        process dbMsg <| updateBody toString
+
+      GetColl dbMsg ->
+        process dbMsg <| updateBody toString
+
+      GetSession dbMsg ->
+        process dbMsg <| updateBody toString
 
 
 type alias RepoInfo =
@@ -117,20 +123,20 @@ repoInfoDecoder =
     ("name" := string)
 
 
-get : (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
+get : (Json.Decoder item) -> (DbMsg item -> Msg) -> String -> Cmd Msg 
 get = MongoDb.get db
 
 
-listDocuments : (Json.Decoder item) -> (Collection item -> m) -> String -> Cmd (DbMsg m)
+listDocuments : (Json.Decoder item) -> (DbMsg (Collection item) -> Msg) -> String -> Cmd Msg 
 listDocuments = MongoDb.listDocuments db
 
 
-getRepoInfos : Cmd (DbMsg Requests)
+--getRepoInfos : Cmd Requests 
 getRepoInfos =
   listDocuments repoInfoDecoder GetColl "coll"
 
 
-getSession : Cmd (DbMsg Requests)
+--getSession : Cmd Requests
 getSession =
   get sessionDecoder GetSession "session"
 

@@ -7,9 +7,12 @@ import Maybe
 import Dict exposing (Dict, empty)
 
 
+-- generic state of request processing
 type alias State msg state = ((Response, state), List (Cmd msg))
+-- main loop functions
 type alias Initializer msg state = Request -> State msg state 
 type alias Updater msg state = Request -> msg -> (Response, state) -> State msg state 
+-- helper function that modifies state according to message
 type alias StateUpdater msg state = State msg state -> State msg state 
 
 
