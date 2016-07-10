@@ -1,6 +1,6 @@
 # Fully featured web server using Elm 0.17
 
-## Work in progress !
+## Work in progress - it is NOT production ready!
 
 [![Build Status](https://travis-ci.org/tunguski/elm-server.svg?branch=master)](https://travis-ci.org/tunguski/elm-server)
 
@@ -55,11 +55,18 @@ Run server
 
 Start with reading [example/Example.elm](example/Example.elm).
 
-Server side Elm application consists of two functions:
+Server side Elm application consists of:
+
+* Internal request processing state ```State```
+* Request processing initialization function ```Initializer```
+* Request processing updating step function ```Updater```
+* Helper interface for single state update ```StateUpdater```
 
 ```elm
-init : Request -> (Response, List (Cmd msg))
-update : Request -> msg -> Response -> (Response, List (Cmd msg))
+type alias State msg state = ((Response, state), List (Cmd msg))
+type alias Initializer msg state = Request -> State msg state 
+type alias Updater msg state = Request -> msg -> (Response, state) -> State msg state 
+type alias StateUpdater msg state = State msg state -> State msg state 
 ```
 
 and program composition:
@@ -74,14 +81,14 @@ main =
 #### init
 
 * takes ```Request``` - that is the request we need to serve
-* returns "empty" response; empty means it won't be send before finishing all tasks
+* returns inital response and state; empty means it won't be send before finishing all tasks
     
 #### update
 
 * takes ```Request``` - same request object as passed to ```init```
 * takes ```msg``` - that is a message returned by performing ```Task```
-* takes ```Response``` - response state returned by ```init``` or last ```update``` invocation
-* returns tuple consisting of new partial response and list of commands to perform
+* takes tuple (```Response```, ```State```) - state returned by ```init``` or last ```update``` invocation
+* returns tuple consisting of new partial state and list of commands to perform
 
 Server processes all internal http requests until there is no more ```Cmd```s and returns the state of ```Response``` from that moment.
 
@@ -90,6 +97,7 @@ Server processes all internal http requests until there is no more ```Cmd```s an
 ```elm
 type alias Request =
   { id : String
+  , headers : List (String, String) 
   , url : String
   , method : String
   }
@@ -97,10 +105,14 @@ type alias Request =
 
 type alias Response =
   { idRequest : String
+  , headers : List (String, String) 
   , statusCode : Int
   , body : String
   }
 ```
+
+* ```id``` and ```idRequest``` are used for internal processing - ignore them
+
 
 ### Mongodb Support
 
@@ -113,7 +125,6 @@ get : String -> (Json.Decoder item) -> (item -> m) -> String -> Cmd (DbMsg m)
 get baseUrl decoder msg collection =
   Http.get decoder
     (concat [ baseUrl, collection ])
-    |> Task.mapError toString
     |> Task.perform 
         ErrorOccurred
         (DataFetched << msg)
