@@ -5,6 +5,8 @@ import Http exposing (Error(..))
 import Json.Decode as Json exposing (..)
 import Task
 import Debug
+import Random exposing (..) 
+import Base64
 
 
 import MongoDb exposing (..)
@@ -23,26 +25,42 @@ type Msg
   = GetDb (DbMsg MongoDb)
   | GetColl (DbMsg (Collection RepoInfo))
   | GetSession (DbMsg Session)
+  | WithSession (DbMsg Session)
+  | NewSessionToken Int 
+
+
+type Action 
+  = LoadDb String
+  | LoadCollection String
 
 
 type alias State =
   { session : Maybe Session
   , data : Maybe String
+  , nextActions : List Action 
   }
 
 
 type alias ServerState = Server.State Msg State
 
 
-type alias StateUpdater = Server.StateUpdater Msg State 
+type alias StateUpdater = Server.StateUpdater Msg State
 
 
 db = "http://admin:changeit@localhost:8888/testdb/"
 
 
+emptyState = State Nothing Nothing []
+
+
+addActions : List Action -> ServerState -> ServerState 
+addActions actions ((response, state), cmds) =
+  ((response, { state | nextActions = actions }), cmds)
+
+
 initResponseTuple : Request -> Cmd Msg -> ServerState 
 initResponseTuple request query =
-  ( (Server.initResponse request.id, State Nothing Nothing ), [ query ] )
+  ( (Server.initResponse request.id, emptyState), [ query ] )
 
 
 init : Initializer Msg State
@@ -54,6 +72,10 @@ init request =
       "/session" ->
         initResponseTuple request getSession
 
+      "/logged/testDb" ->
+        initResponseTuple request getSession
+          |> addActions [ LoadDb "testDb" ]
+
       "/testDb" ->
         initResponseTuple request <| getDatabaseDescription db GetDb
 
@@ -61,7 +83,7 @@ init request =
         let
           debugLog = Debug.log "Not found" request.url
         in
-          ( ( initResponseStatus request.id 404, State Nothing Nothing), [] )
+          ( ( initResponseStatus request.id 404, emptyState), [] )
 
 
 updateBody : (data -> String) -> data -> StateUpdater 
@@ -76,8 +98,17 @@ updateStatus getter data =
     (({ response | statusCode = getter data }, state), []))
 
 
-errorProcessor : ServerState -> DbMsg a -> (a -> StateUpdater) -> ServerState 
-errorProcessor st msg fn =
+type alias ErrorProcessor a = ServerState -> DbMsg a -> (a -> StateUpdater) -> ServerState
+type alias BadResponseProcessor = Int -> String -> StateUpdater 
+
+
+returnBadResponse : BadResponseProcessor 
+returnBadResponse statusCode body =
+  (updateStatus (always statusCode) >> updateBody (always body)) ()
+
+
+badResponseProcessor : BadResponseProcessor -> ErrorProcessor a
+badResponseProcessor badResponse st msg fn =
   case msg of
     DataFetched data ->
       (fn data) st
@@ -90,7 +121,32 @@ errorProcessor st msg fn =
         UnexpectedPayload payload ->
           (updateStatus (always 500) >> updateBody (always payload)) () st 
         BadResponse statusCode body ->
-          (updateStatus (always statusCode) >> updateBody (always body)) () st 
+          badResponse statusCode body st
+
+
+errorProcessor : ErrorProcessor a
+errorProcessor st msg fn =
+  badResponseProcessor returnBadResponse st msg fn
+
+
+maybeCreateNewSession : BadResponseProcessor 
+maybeCreateNewSession statusCode body =
+  case Debug.log "maybeCreateNewSession" statusCode of
+    404 ->
+      \((response, state), cmds) -> 
+        ((response, state), [ generate NewSessionToken (Random.int minInt maxInt) ] )
+    _ ->
+      returnBadResponse statusCode body
+
+
+setBodyToString : a -> StateUpdater
+setBodyToString =
+  updateBody toString
+
+
+setCookie : String -> String -> StateUpdater
+setCookie name value ((response, state), cmds) =
+  (({ response | headers = (name, value) :: response.headers }, state), cmds)
 
 
 update : Updater Msg State
@@ -101,13 +157,40 @@ update request msg (response, state) =
   in
     case msg of
       GetDb dbMsg ->
-        process dbMsg <| updateBody toString
+        process dbMsg setBodyToString 
 
       GetColl dbMsg ->
-        process dbMsg <| updateBody toString
+        process dbMsg setBodyToString 
 
       GetSession dbMsg ->
-        process dbMsg <| updateBody toString
+        badResponseProcessor
+          maybeCreateNewSession 
+          st
+          dbMsg 
+          setBodyToString
+
+      WithSession dbMsg ->
+        badResponseProcessor
+          returnBadResponse 
+          st
+          dbMsg 
+          setBodyToString
+
+      NewSessionToken token ->
+        updateBody toString token <| setCookie "Set-Cookie" "SESSIONID=test;" st 
+
+
+executeAction : Request -> StateUpdater 
+executeAction request ((response, state), cmds) =
+  case Debug.log "nextActions" state.nextActions of
+    [] -> 
+      ((response, state), cmds)
+
+    LoadDb name :: tail ->
+      ((response, state), [])
+
+    LoadCollection name :: tail ->
+      ((response, state), [])
 
 
 type alias RepoInfo =
@@ -131,12 +214,12 @@ listDocuments : (Json.Decoder item) -> (DbMsg (Collection item) -> Msg) -> Strin
 listDocuments = MongoDb.listDocuments db
 
 
---getRepoInfos : Cmd Requests 
+getRepoInfos : Cmd Msg
 getRepoInfos =
   listDocuments repoInfoDecoder GetColl "coll"
 
 
---getSession : Cmd Requests
+getSession : Cmd Msg
 getSession =
   get sessionDecoder GetSession "session"
 
