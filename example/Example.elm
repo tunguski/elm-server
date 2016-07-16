@@ -177,7 +177,8 @@ update request msg (response, state) =
           setBodyToString
 
       NewSessionToken token ->
-        updateBody toString token <| setCookie "Set-Cookie" "SESSIONID=test;" st 
+        updateBody toString token <| setCookie "Set-Cookie" 
+          ("SESSIONID=" ++ (toString token) ++ ";") st 
 
 
 executeAction : Request -> StateUpdater 

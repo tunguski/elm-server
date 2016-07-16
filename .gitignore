@@ -2,7 +2,9 @@
 *.log
 npm-debug.log
 main.js
+public/example.js
 
-elm-stuff
-node_modules
+elm-stuff/
+node_modules/
+client
 *.bak

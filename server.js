@@ -1,5 +1,6 @@
 const http = require('http');
 const elm = require('./main');
+const static = require('node-static');
 
 global.XMLHttpRequest = require("xhr2");
 
@@ -53,6 +54,18 @@ const server = http.createServer((req, res) => {
     method : req.method 
   });
 });
+
+
+const file = new static.Server('./public');
+ 
+http.createServer(function (request, response) {
+    request.addListener('end', function () {
+        // 
+        // Serve files! 
+        // 
+        file.serve(request, response);
+    }).resume();
+}).listen(8000);
 
 
 server.on('clientError', (err, socket) => {
