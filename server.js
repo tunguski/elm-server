@@ -17,6 +17,7 @@ app.ports.sendResponse.subscribe(function(response) {
     response.headers.forEach(function (header) {
       reqRes.res.setHeader(header[0], header[1]);
     });
+    reqRes.res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8000');
 
     if (response.statusCode) {
       reqRes.res.statusCode = response.statusCode;
