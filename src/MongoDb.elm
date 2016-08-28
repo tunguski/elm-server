@@ -8,10 +8,15 @@ import String exposing (concat)
 import Platform.Cmd as Cmd
 
 
+type DbMsg msg
+  = DataFetched msg
+  | ErrorOccurred Http.Error
+
+
 get : String -> (Json.Decoder item) -> (DbMsg item -> m) -> String -> Cmd m
 get baseUrl decoder msg collection =
   Http.get decoder
-    (concat [ baseUrl, collection ])
+    (baseUrl ++ collection)
     |> Task.perform ErrorOccurred DataFetched
     |> Cmd.map msg
 
@@ -26,19 +31,17 @@ getDatabaseDescription baseUrl msg =
   get baseUrl mongoDbDecoder msg ""
 
 
-type DbMsg msg
-  = DataFetched msg
-  | ErrorOccurred Http.Error
-
-
-put decoder url body =
-   fromJson decoder <|
-   Http.send defaultSettings
+put : String -> String -> String -> (DbMsg String -> m) -> Cmd m
+put baseUrl url body msg =
+   (Http.send defaultSettings
     { verb = "PUT"
-    , headers = []
-    , url = url
-    , body = body
-    }
+    , headers = [ ("Content-Type", "application/json") ]
+    , url = baseUrl ++ url
+    , body = Http.string body
+    })
+    |> fromJson Json.string
+    |> Task.perform ErrorOccurred DataFetched
+    |> Cmd.map msg
 
 
 delete decoder url =

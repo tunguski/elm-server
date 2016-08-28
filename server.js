@@ -1,4 +1,5 @@
 const http = require('http');
+const httpProxy = require('http-proxy');
 const static = require('node-static');
 const watch = require('watch')
 
@@ -10,8 +11,9 @@ var app;
 
 
 // TODO: switch to redis
-var requestCache = {};
+const requestCache = {};
 
+const proxy = httpProxy.createProxyServer();
 
 function startElmServer() {
   delete require.cache[require.resolve('./main')]
@@ -133,11 +135,17 @@ const serverBuilder = elmBuilder(['src/', 'example/'],
     startElmServer);
 
 
+const httpPort = 8000;
 http.createServer(function (request, response) {
-  request.addListener('end', function () {
-    file.serve(request, response);
-  }).resume();
-}).listen(8000);
+  if (request.url.startsWith("/api")) {
+    proxy.web(request, response, { target: 'http://localhost:8080' });
+  } else {
+    request.addListener('end', function () {
+      file.serve(request, response);
+    }).resume();
+  }
+}).listen(httpPort);
+console.log('\nHttp server listening on port ' + httpPort);
 
 
 server.on('clientError', (err, socket) => {
@@ -145,6 +153,6 @@ server.on('clientError', (err, socket) => {
 });
 
 
-var port = 8080;
+const port = 8080;
 server.listen(port);
-console.log('\nServer listening on port ' + port);
+console.log('\nBackend server listening on port ' + port);

@@ -5,13 +5,16 @@ import Http exposing (Error(..))
 import Json.Decode as Json exposing (..)
 import Task
 import Debug
+import Dict
 import Random exposing (..) 
 import Base64
 
 
-import MongoDb exposing (..)
+import MongoDb exposing (DbMsg(..), Collection, MongoDb, getDatabaseDescription)
 import Server exposing (..)
 import Session exposing (..)
+import Repo exposing (..)
+import ExampleDb exposing (..)
 
 
 main =
@@ -22,22 +25,25 @@ main =
 
 
 type Msg 
-  = GetDb (DbMsg MongoDb)
+  = LoadSession (DbMsg Session)
+  | PutSession (DbMsg String)
+  | GetDb (DbMsg MongoDb)
   | GetColl (DbMsg (Collection RepoInfo))
-  | GetSession (DbMsg Session)
-  | WithSession (DbMsg Session)
   | NewSessionToken Int 
 
 
 type Action 
-  = LoadDb String
+  = DoNothing 
+  | ReturnSession 
+  | MaybeCreateSession 
+  | LoadDb String
   | LoadCollection String
 
 
 type alias State =
   { session : Maybe Session
   , data : Maybe String
-  , nextActions : List Action 
+  , nextAction : Action 
   }
 
 
@@ -47,55 +53,72 @@ type alias ServerState = Server.State Msg State
 type alias StateUpdater = Server.StateUpdater Msg State
 
 
-db = "http://admin:changeit@localhost:8888/testdb/"
 
 
-emptyState = State Nothing Nothing []
+emptyState = State Nothing Nothing DoNothing
 
 
-addActions : List Action -> ServerState -> ServerState 
-addActions actions ((response, state), cmds) =
-  ((response, { state | nextActions = actions }), cmds)
+withAction : Action -> ServerState -> ServerState 
+withAction action ((response, state), cmd) =
+  ((response, { state | nextAction = action }), cmd)
 
 
 initResponseTuple : Request -> Cmd Msg -> ServerState 
 initResponseTuple request query =
-  ( (Server.initResponse request.id, emptyState), [ query ] )
+  ( (Server.initResponse request.id, emptyState), Just query )
+
+
+doWithResponseAndSession : Request -> Action -> ServerState 
+doWithResponseAndSession request action =
+  let
+    idSession =
+      Debug.log "idSession" <|
+      case Dict.get "SESSIONID" <| getCookies request of
+        Just id -> id
+        Nothing -> "empty"
+  in
+    initResponseTuple request (getSession idSession LoadSession)
+      |> withAction action
 
 
 init : Initializer Msg State
 init request =
-    case request.url of
-      "/" ->
-        initResponseTuple request getRepoInfos 
-
-      "/session" ->
-        initResponseTuple request getSession
-
-      "/logged/testDb" ->
-        initResponseTuple request getSession
-          |> addActions [ LoadDb "testDb" ]
-
-      "/testDb" ->
-        initResponseTuple request <| getDatabaseDescription db GetDb
-
-      _ ->
-        let
-          debugLog = Debug.log "Not found" request.url
-        in
-          ( ( initResponseStatus request.id 404, emptyState), [] )
+    let
+      doWithSession = doWithResponseAndSession request
+    in
+      case request.url of
+        "/api" ->
+          initResponseTuple request <| getRepoInfos GetColl
+  
+        "/api/session" ->
+          doWithSession ReturnSession
+  
+        "/api/session/guest" ->
+          doWithSession MaybeCreateSession
+  
+        "/api/logged/testDb" ->
+          doWithSession <| LoadDb "testDb"
+  
+        "/api/testDb" ->
+          initResponseTuple request <| getDatabaseDescription db GetDb
+  
+        _ ->
+          let
+            debugLog = Debug.log "Not found" request.url
+          in
+            ( ( initResponseStatus request.id 404, emptyState), Nothing )
 
 
 updateBody : (data -> String) -> data -> StateUpdater 
 updateBody getter data =
-  (\((response, state), cmds) ->
-    (({ response | body = getter data }, state), []))
+  (\((response, state), cmd) ->
+    (({ response | body = getter data }, state), cmd))
 
 
 updateStatus : (data -> Int) -> data -> StateUpdater 
 updateStatus getter data = 
-  (\((response, state), cmds) ->
-    (({ response | statusCode = getter data }, state), []))
+  (\((response, state), cmd) ->
+    (({ response | statusCode = getter data }, state), cmd))
 
 
 type alias ErrorProcessor a = ServerState -> DbMsg a -> (a -> StateUpdater) -> ServerState
@@ -134,7 +157,7 @@ maybeCreateNewSession statusCode body =
   case Debug.log "maybeCreateNewSession" statusCode of
     404 ->
       \((response, state), cmds) -> 
-        ((response, state), [ generate NewSessionToken (Random.int minInt maxInt) ] )
+        ((response, state), Just ( generate NewSessionToken (Random.int minInt maxInt) ) )
     _ ->
       returnBadResponse statusCode body
 
@@ -152,76 +175,83 @@ setCookie name value ((response, state), cmds) =
 update : Updater Msg State
 update request msg (response, state) =
   let
-    st = ((response, state), [])
+    st = ((response, state), Nothing)
     process = errorProcessor st
   in
     case msg of
+--      WithSession dbMsg ->
+--        badResponseProcessor
+--          returnBadResponse 
+--          st
+--          dbMsg 
+--          setBodyToString
+
+      LoadSession dbMsg ->
+        let
+          updatedState =
+            case dbMsg of
+              DataFetched session ->
+                ((response, { state | session = Just session }), Nothing)
+              ErrorOccurred err ->
+                ((response, state), Nothing)
+        in
+          executeAction request updatedState
+
       GetDb dbMsg ->
         process dbMsg setBodyToString 
 
       GetColl dbMsg ->
         process dbMsg setBodyToString 
 
-      GetSession dbMsg ->
-        badResponseProcessor
-          maybeCreateNewSession 
-          st
-          dbMsg 
-          setBodyToString
-
-      WithSession dbMsg ->
-        badResponseProcessor
-          returnBadResponse 
-          st
-          dbMsg 
-          setBodyToString
-
       NewSessionToken token ->
-        updateBody toString token <| setCookie "Set-Cookie" 
-          ("SESSIONID=" ++ (toString token) ++ ";") st 
+        let
+          stringToken = toString token
+          newSession = Session stringToken stringToken Nothing Nothing stringToken
+          putResult = 
+            ExampleDb.put ("session/" ++ stringToken) (encodeSession newSession) 
+            PutSession
+        in
+          ((response, { state | session = Just newSession}), Just putResult)
+
+      PutSession dbMsg ->
+        case state.session of
+          Just session ->
+            updateBody encodeSession session st
+            |>
+            setCookie "Set-Cookie" 
+              ("SESSIONID=" ++ session.token ++ "; Path=/;")
+          Nothing ->
+            Debug.crash "Should have session"
 
 
 executeAction : Request -> StateUpdater 
-executeAction request ((response, state), cmds) =
-  case Debug.log "nextActions" state.nextActions of
-    [] -> 
-      ((response, state), cmds)
+executeAction request ((response, state), cmd) =
+  case state.nextAction of
+    DoNothing -> 
+      ((response, state), cmd)
 
-    LoadDb name :: tail ->
-      ((response, state), [])
+    ReturnSession ->
+      setBodyToString state.session ((response, state), cmd)
 
-    LoadCollection name :: tail ->
-      ((response, state), [])
+--    GetSession dbMsg ->
+--      badResponseProcessor
+--        maybeCreateNewSession 
+--        st
+--        dbMsg 
+--        setBodyToString
 
+    MaybeCreateSession ->
+      case Debug.log "session" state.session of
+        Just session ->
+          setBodyToString state.session ((response, state), cmd)
+        Nothing ->
+          ((response, state), Just ( generate NewSessionToken (Random.int minInt maxInt) ) )
+            |> withAction DoNothing
 
-type alias RepoInfo =
-  { id : String 
-  , name : String
-  }
+    LoadDb name ->
+      ((response, state), Nothing)
 
-
-repoInfoDecoder : Json.Decoder RepoInfo
-repoInfoDecoder =
-  Json.object2 RepoInfo 
-    (at ["_id" ] <| "$oid" := string)
-    ("name" := string)
-
-
-get : (Json.Decoder item) -> (DbMsg item -> Msg) -> String -> Cmd Msg 
-get = MongoDb.get db
-
-
-listDocuments : (Json.Decoder item) -> (DbMsg (Collection item) -> Msg) -> String -> Cmd Msg 
-listDocuments = MongoDb.listDocuments db
-
-
-getRepoInfos : Cmd Msg
-getRepoInfos =
-  listDocuments repoInfoDecoder GetColl "coll"
-
-
-getSession : Cmd Msg
-getSession =
-  get sessionDecoder GetSession "session"
+    LoadCollection name ->
+      ((response, state), Nothing)
 
 

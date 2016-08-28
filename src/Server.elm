@@ -8,7 +8,7 @@ import Dict exposing (Dict, empty)
 
 
 -- generic state of request processing
-type alias State msg state = ((Response, state), List (Cmd msg))
+type alias State msg state = ((Response, state), Maybe (Cmd msg))
 -- main loop functions
 type alias Initializer msg state = Request -> State msg state 
 type alias Updater msg state = Request -> msg -> (Response, state) -> State msg state 
@@ -45,6 +45,35 @@ type alias Response =
   }
 
 
+getCookies : Request -> Dict String String
+getCookies request =
+  let
+    extractCookie cookie =
+      case String.split "=" <| String.trim cookie of
+        key :: value :: t ->
+          Just (key, value)
+        _ -> 
+          Nothing
+    splitCookies cookie = 
+      String.split ";" cookie
+  in
+    case getHeader "cookie" request of
+      Just cookies ->
+          splitCookies cookies
+          |> List.map extractCookie
+          |> List.filterMap identity
+          |> Dict.fromList
+      Nothing -> Dict.empty
+
+
+getHeader : String -> Request -> Maybe String
+getHeader key request =
+  List.filter (\((headerKey, value)) -> headerKey == key) request.headers
+    |> List.head
+    |> Maybe.map (\((k, v)) -> v)
+    
+
+
 initResponseStatus idRequest statusCode =
   Response idRequest [("Server", "Tunguski's Elm-Server")] statusCode ""
 
@@ -53,15 +82,14 @@ initResponse idRequest =
   initResponseStatus idRequest 200
 
 
-type alias Processing msg state =
+type alias Processing state =
   { request : Request
   , response : (Response, state)
-  , queue : List (Cmd msg)
   }
 
 
-type alias Model msg state 
-  = Dict String (Processing msg state)
+type alias Model state 
+  = Dict String (Processing state)
 
 
 -- UPDATE
@@ -78,39 +106,39 @@ port sendResponse : Response -> Cmd msg
 update : Initializer m state
           -> Updater m state
           -> Msg m
-          -> Model m state
-          -> (Model m state, Cmd (Msg m))
+          -> Model state
+          -> (Model state, Cmd (Msg m))
 update initializer updater msg model =
   case msg of
     IncomingRequest request ->
       let
-        ((response, st), cmds) = initializer request
+        ((response, st), cmd) = initializer request
       in
-        if List.isEmpty cmds
-        then
-          model
-          ! [ sendResponse response ]
-        else
-          Dict.insert request.id
-            (Processing request (response, st) cmds)
+        case cmd of
+          Just innerMsg ->
+            Dict.insert request.id
+              (Processing request (response, st))
+              model
+            ! [Cmd.map (InternalMsg request.id) innerMsg]
+          Nothing ->
             model
-          ! (List.map (\s -> Cmd.map (InternalMsg request.id) s) cmds)
+            ! [ sendResponse response ]
     InternalMsg idRequest internalMessage ->
       case Dict.get idRequest model of
         Just processing ->
           let
-            ((response, st), cmds) =
-             updater processing.request internalMessage processing.response
+            ((response, st), cmd) =
+               updater processing.request internalMessage processing.response
           in
-            if List.isEmpty cmds
-            then
-              Dict.remove processing.request.id model
-              ! [ sendResponse response ]
-            else
-              Dict.insert processing.request.id
-                (Processing processing.request (response, st) cmds)
-                model
-              ! (List.map (\s -> Cmd.map (InternalMsg processing.request.id) s) cmds)
+            case cmd of
+              Just innerMsg ->
+                Dict.insert processing.request.id
+                  (Processing processing.request (response, st))
+                  model
+                ! [Cmd.map (InternalMsg processing.request.id) innerMsg]
+              Nothing ->
+                Dict.remove processing.request.id model
+                ! [ sendResponse response ]
         Nothing ->
           model ! []
 
@@ -121,14 +149,14 @@ port request : (Request -> msg) -> Sub msg
 -- SUBSCRIPTIONS
 
 
-subscriptions : Model msg state -> Sub (Msg msg)
+subscriptions : Model state -> Sub (Msg msg)
 subscriptions model =
   request IncomingRequest
 
 
 -- VIEW
 
-view : Model msg state -> Html (Msg msg)
+view : Model state -> Html (Msg msg)
 view model = text "Use the API Luke!"
 
 

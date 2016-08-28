@@ -4,6 +4,7 @@
   "description": "",
   "main": "server.js",
   "dependencies": {
+    "http-proxy": "^1.14.0",
     "node-static": "^0.7.7",
     "watch": "^0.19.1",
     "xhr2": "^0.1.3"
