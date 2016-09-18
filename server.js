@@ -106,7 +106,7 @@ function elmBuilder (paths, cmd, postBuild) {
 
 
   paths.forEach(function (path) {
-    watch.watchTree(path, { ignoreDotFiles : true }, function (f, curr, prev) {
+    watch.watchTree(path, { ignoreDotFiles : true, interval: 1 }, function (f, curr, prev) {
       if (typeof f == "object" && prev === null && curr === null) {
         // Finished walking the tree
       } else if (prev === null) {

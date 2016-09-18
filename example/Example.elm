@@ -72,7 +72,6 @@ doWithResponseAndSession : Request -> Action -> ServerState
 doWithResponseAndSession request action =
   let
     idSession =
-      Debug.log "idSession" <|
       case Dict.get "SESSIONID" <| getCookies request of
         Just id -> id
         Nothing -> "empty"
@@ -189,7 +188,7 @@ update request msg (response, state) =
       LoadSession dbMsg ->
         let
           updatedState =
-            case dbMsg of
+            case Debug.log "session" dbMsg of
               DataFetched session ->
                 ((response, { state | session = Just session }), Nothing)
               ErrorOccurred err ->
@@ -231,7 +230,11 @@ executeAction request ((response, state), cmd) =
       ((response, state), cmd)
 
     ReturnSession ->
-      setBodyToString state.session ((response, state), cmd)
+      case state.session of
+        Just session ->
+          updateBody encodeSession session ((response, state), cmd)
+        Nothing ->
+          ((response, state), cmd)
 
 --    GetSession dbMsg ->
 --      badResponseProcessor
