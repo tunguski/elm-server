@@ -1,13 +1,14 @@
 module Example exposing (..)
 
 
-import Http exposing (Error(..))
-import Json.Decode as Json exposing (..)
-import Task
+import Base64
 import Debug
 import Dict
+import Http exposing (Error(..))
+import Json.Decode as Json exposing (..)
 import Random exposing (..) 
-import Base64
+import String
+import Task
 
 
 import MongoDb exposing (DbMsg(..), Collection, MongoDb, getDatabaseDescription)
@@ -35,6 +36,8 @@ type Msg
 type Action 
   = DoNothing 
   | ReturnSession 
+  | LoadTables
+  | CreateTable
   | MaybeCreateSession 
   | LoadDb String
   | LoadCollection String
@@ -94,6 +97,13 @@ init request =
   
         "/api/session/guest" ->
           doWithSession MaybeCreateSession
+  
+        "/api/tables" ->
+          case String.toLower request.method of
+            "post" ->
+              Debug.log "method" <| doWithSession CreateTable
+            _ ->
+              doWithSession LoadTables
   
         "/api/logged/testDb" ->
           doWithSession <| LoadDb "testDb"
@@ -250,6 +260,20 @@ executeAction request ((response, state), cmd) =
         Nothing ->
           ((response, state), Just ( generate NewSessionToken (Random.int minInt maxInt) ) )
             |> withAction DoNothing
+
+    LoadTables ->
+      ((response, state), Nothing)
+
+    CreateTable ->
+      ((response, state), Nothing)
+--      let
+--        stringToken = toString token
+--        newSession = Session stringToken stringToken Nothing Nothing stringToken
+--        putResult = 
+--          ExampleDb.put ("session/" ++ stringToken) (encodeSession newSession) 
+--          PutSession
+--      in
+--        ((response, { state | session = Just newSession}), Just putResult)
 
     LoadDb name ->
       ((response, state), Nothing)

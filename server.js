@@ -62,12 +62,29 @@ const server = http.createServer((req, res) => {
     headers.push([ header, req.headers[header] ]);
   }
 
-  app.ports.request.send({ 
-    id : id, 
-    url : req.url, 
-    headers : headers,
-    method : req.method 
+  var body = [];
+  req.on('data', function(chunk) {
+    body.push(chunk);
+  }).on('end', function() {
+
+    if (body.length === 0) {
+      body = "";
+    } else {
+      body = Buffer.concat(body).toString();
+    }
+
+    // at this point, `body` has the entire request body stored in it as a string
+    
+    app.ports.request.send({ 
+      id : id, 
+      url : req.url, 
+      headers : headers,
+      method : req.method,
+      body : body
+    });
   });
+
+
 });
 
 

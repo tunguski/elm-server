@@ -34,6 +34,7 @@ type alias Request =
   , headers : List (String, String) 
   , url : String
   , method : String
+  , body : String
   }
 
 
