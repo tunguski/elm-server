@@ -5,6 +5,8 @@ import Date exposing (Date, fromString)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
 import Result exposing (toMaybe)
+import Task exposing (Task)
+import Http exposing (Error)
 
 
 import MongoDb exposing (DbMsg, Collection)
@@ -63,8 +65,8 @@ encodeSession session =
   JE.encode 0 <| sessionEncoder session
 
 
-getSession : String -> (DbMsg Session -> msg) -> Cmd msg
-getSession idSession msg =
-  get sessionDecoder msg ("session/" ++ idSession)
+getSession : String -> Task Error Session
+getSession idSession =
+  get sessionDecoder ("session/" ++ idSession)
 
 

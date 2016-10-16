@@ -11,7 +11,7 @@ import String
 import Task
 
 
-import MongoDb exposing (DbMsg(..), Collection, MongoDb, getDatabaseDescription)
+import MongoDb exposing (DbMsg(..), Collection, MongoDb, getDatabaseDescription, perform)
 import Server exposing (..)
 import Session exposing (..)
 import Repo exposing (..)
@@ -37,7 +37,7 @@ type Action
   = DoNothing 
   | ReturnSession 
   | LoadTables
-  | CreateTable
+--  | CreateTable
   | MaybeCreateSession 
   | LoadDb String
   | LoadCollection String
@@ -71,7 +71,7 @@ initResponseTuple request query =
   ( (Server.initResponse request.id, emptyState), Just query )
 
 
-doWithResponseAndSession : Request -> Action -> ServerState 
+doWithResponseAndSession : Request -> Action -> ServerState
 doWithResponseAndSession request action =
   let
     idSession =
@@ -79,7 +79,7 @@ doWithResponseAndSession request action =
         Just id -> id
         Nothing -> "empty"
   in
-    initResponseTuple request (getSession idSession LoadSession)
+    initResponseTuple request (getSession idSession |> perform LoadSession)
       |> withAction action
 
 
@@ -91,25 +91,55 @@ init request =
       case request.url of
         "/api" ->
           initResponseTuple request <| getRepoInfos GetColl
+--      GetColl dbMsg ->
+--        process dbMsg setBodyToString 
   
         "/api/session" ->
           doWithSession ReturnSession
+--    ReturnSession ->
+--      case state.session of
+--        Just session ->
+--          updateBody encodeSession session ((response, state), cmd)
+--        Nothing ->
+--          ((response, state), cmd)
   
         "/api/session/guest" ->
           doWithSession MaybeCreateSession
+--    MaybeCreateSession ->
+--      case Debug.log "session" state.session of
+--        Just session ->
+--          setBodyToString state.session ((response, state), cmd)
+--        Nothing ->
+--          ((response, state), Just ( generate NewSessionToken (Random.int minInt maxInt) ) )
+--            |> withAction DoNothing
   
-        "/api/tables" ->
-          case String.toLower request.method of
-            "post" ->
-              Debug.log "method" <| doWithSession CreateTable
-            _ ->
-              doWithSession LoadTables
+--        "/api/tables" ->
+--          case String.toLower request.method of
+--            "post" ->
+--              Debug.log "method" <| doWithSession CreateTable
+--    CreateTable ->
+----      ((response, state), Nothing)
+--      let
+--        tableName = request.body
+--        getResult = 
+--          ExampleDb.get ("table/" ++ tableName)
+--          PutSession
+--      in
+--        ((response, { state | session = Just newSession}), Just putResult)
+--            _ ->
+--              doWithSession LoadTables
+--    LoadTables ->
+--      ((response, state), Nothing)
   
         "/api/logged/testDb" ->
           doWithSession <| LoadDb "testDb"
+--    LoadDb name ->
+--      ((response, state), Nothing)
   
         "/api/testDb" ->
           initResponseTuple request <| getDatabaseDescription db GetDb
+--      GetDb dbMsg ->
+--        process dbMsg setBodyToString 
   
         _ ->
           let
@@ -264,16 +294,15 @@ executeAction request ((response, state), cmd) =
     LoadTables ->
       ((response, state), Nothing)
 
-    CreateTable ->
-      ((response, state), Nothing)
+--    CreateTable ->
+----      ((response, state), Nothing)
 --      let
---        stringToken = toString token
---        newSession = Session stringToken stringToken Nothing Nothing stringToken
---        putResult = 
---          ExampleDb.put ("session/" ++ stringToken) (encodeSession newSession) 
+--        tableName = request.body
+--        getResult = 
+--          ExampleDb.get ("table/" ++ tableName)
 --          PutSession
 --      in
---        ((response, { state | session = Just newSession}), Just putResult)
+--        ((response, state), Just getResult)
 
     LoadDb name ->
       ((response, state), Nothing)

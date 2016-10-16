@@ -13,22 +13,28 @@ type DbMsg msg
   | ErrorOccurred Http.Error
 
 
-get : String -> (Json.Decoder item) -> (DbMsg item -> m) -> String -> Cmd m
-get baseUrl decoder msg collection =
-  Http.get decoder
-    (baseUrl ++ collection)
+perform : (DbMsg value -> m) -> Task Error value -> Cmd m
+perform msg task = 
+  task
     |> Task.perform ErrorOccurred DataFetched
     |> Cmd.map msg
 
 
+get : String -> (Json.Decoder item) -> String -> Task Error item
+get baseUrl decoder collection =
+  Http.get decoder (baseUrl ++ collection)
+
+
 listDocuments : String -> (Json.Decoder item) -> (DbMsg (Collection item) -> m) -> String -> Cmd m
 listDocuments baseUrl decoder msg collection =
-  get baseUrl (collectionDecoder decoder) msg collection
+  get baseUrl (collectionDecoder decoder) collection
+    |> perform msg
 
 
 getDatabaseDescription : String -> (DbMsg MongoDb -> m) -> Cmd m
 getDatabaseDescription baseUrl msg =
-  get baseUrl mongoDbDecoder msg ""
+  get baseUrl mongoDbDecoder ""
+    |> perform msg
 
 
 put : String -> String -> String -> (DbMsg String -> m) -> Cmd m
@@ -40,8 +46,7 @@ put baseUrl url body msg =
     , body = Http.string body
     })
     |> fromJson Json.string
-    |> Task.perform ErrorOccurred DataFetched
-    |> Cmd.map msg
+    |> perform msg
 
 
 delete decoder url =
