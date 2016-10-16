@@ -7,16 +7,20 @@ import Maybe
 import Dict exposing (Dict, empty)
 
 
--- generic state of request processing
-type alias State msg state = ((Response, state), Maybe (Cmd msg))
+type Partial msg
+  = Result Response
+  | Command (Cmd msg)
+
+-- -- generic state of request processing
+-- type alias State msg state = ((Response, state), Maybe (Cmd msg))
 -- main loop functions
-type alias Initializer msg state = Request -> State msg state 
-type alias Updater msg state = Request -> msg -> (Response, state) -> State msg state 
--- helper function that modifies state according to message
-type alias StateUpdater msg state = State msg state -> State msg state 
+type alias Initializer msg = Request -> Partial msg
+type alias Updater msg = Request -> msg -> Partial msg
+-- -- helper function that modifies state according to message
+-- type alias StateUpdater msg state = State msg state -> State msg state 
 
 
-program : Initializer msg state -> Updater msg state -> Program Never
+program : Initializer msg -> Updater msg -> Program Never
 program initializer updater =
   Html.program
     { init = (empty, Cmd.none)
@@ -39,11 +43,33 @@ type alias Request =
 
 
 type alias Response =
+  { headers : List (String, String) 
+  , statusCode : Int
+  , body : String
+  }
+
+
+type alias PortResponse =
   { idRequest : String
   , headers : List (String, String) 
   , statusCode : Int
   , body : String
   }
+
+
+okResponse : String -> Response
+okResponse body =
+  Response [] 200 body 
+
+
+statusResponse : Int -> Response
+statusResponse status =
+  Response [] status ""
+
+
+response : Int -> String -> Response
+response status body =
+  Response [] status body 
 
 
 getCookies : Request -> Dict String String
@@ -75,22 +101,8 @@ getHeader key request =
     
 
 
-initResponseStatus idRequest statusCode =
-  Response idRequest [("Server", "Tunguski's Elm-Server")] statusCode ""
-
-
-initResponse idRequest =
-  initResponseStatus idRequest 200
-
-
-type alias Processing state =
-  { request : Request
-  , response : (Response, state)
-  }
-
-
-type alias Model state 
-  = Dict String (Processing state)
+type alias Model
+  = Dict String Request
 
 
 -- UPDATE
@@ -101,47 +113,39 @@ type Msg msg
   | InternalMsg String msg
 
 
-port sendResponse : Response -> Cmd msg
+port sendResponsePort : PortResponse -> Cmd msg
+
+sendResponse : Request -> Response -> Cmd msg
+sendResponse request response =
+  PortResponse request.id response.headers response.statusCode response.body
+    |> sendResponsePort
 
 
-update : Initializer m state
-          -> Updater m state
-          -> Msg m
-          -> Model state
-          -> (Model state, Cmd (Msg m))
+update : Initializer m
+      -> Updater m
+      -> Msg m
+      -> Model
+      -> (Model, Cmd (Msg m))
 update initializer updater msg model =
   case msg of
     IncomingRequest request ->
-      let
-        ((response, st), cmd) = initializer request
-      in
-        case cmd of
-          Just innerMsg ->
-            Dict.insert request.id
-              (Processing request (response, st))
-              model
-            ! [Cmd.map (InternalMsg request.id) innerMsg]
-          Nothing ->
-            model
-            ! [ sendResponse response ]
+      case initializer request of
+        Result response ->
+          model ! [ sendResponse request response ]
+        Command cmd ->
+          Dict.insert request.id request model
+            ! [ Cmd.map (InternalMsg request.id) cmd ]
     InternalMsg idRequest internalMessage ->
       case Dict.get idRequest model of
-        Just processing ->
-          let
-            ((response, st), cmd) =
-               updater processing.request internalMessage processing.response
-          in
-            case cmd of
-              Just innerMsg ->
-                Dict.insert processing.request.id
-                  (Processing processing.request (response, st))
-                  model
-                ! [Cmd.map (InternalMsg processing.request.id) innerMsg]
-              Nothing ->
-                Dict.remove processing.request.id model
-                ! [ sendResponse response ]
+        Just request ->
+          case updater request internalMessage of
+            Result response ->
+              model ! [ sendResponse request response ]
+            Command cmd ->
+              Dict.remove request.id model
+                ! [ Cmd.map (InternalMsg idRequest) cmd ]
         Nothing ->
-          model ! []
+          Debug.crash "Illegal state"
 
 
 port request : (Request -> msg) -> Sub msg
@@ -150,14 +154,14 @@ port request : (Request -> msg) -> Sub msg
 -- SUBSCRIPTIONS
 
 
-subscriptions : Model state -> Sub (Msg msg)
+subscriptions : Model -> Sub (Msg msg)
 subscriptions model =
   request IncomingRequest
 
 
 -- VIEW
 
-view : Model state -> Html (Msg msg)
+view : Model -> Html (Msg msg)
 view model = text "Use the API Luke!"
 
 

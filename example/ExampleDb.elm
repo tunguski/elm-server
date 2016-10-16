@@ -20,7 +20,7 @@ put : String -> String -> (DbMsg String -> m) -> Cmd m
 put = MongoDb.put db
 
 
-listDocuments : (Json.Decoder item) -> (DbMsg (Collection item) -> msg) -> String -> Cmd msg 
+listDocuments : (Json.Decoder item) -> String -> Task Error (Collection item)
 listDocuments = MongoDb.listDocuments db
 
 

@@ -25,16 +25,14 @@ get baseUrl decoder collection =
   Http.get decoder (baseUrl ++ collection)
 
 
-listDocuments : String -> (Json.Decoder item) -> (DbMsg (Collection item) -> m) -> String -> Cmd m
-listDocuments baseUrl decoder msg collection =
+listDocuments : String -> (Json.Decoder item) -> String -> Task Error (Collection item)
+listDocuments baseUrl decoder collection =
   get baseUrl (collectionDecoder decoder) collection
-    |> perform msg
 
 
-getDatabaseDescription : String -> (DbMsg MongoDb -> m) -> Cmd m
-getDatabaseDescription baseUrl msg =
+getDatabaseDescription : String -> Task Error MongoDb
+getDatabaseDescription baseUrl =
   get baseUrl mongoDbDecoder ""
-    |> perform msg
 
 
 put : String -> String -> String -> (DbMsg String -> m) -> Cmd m

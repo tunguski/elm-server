@@ -2,6 +2,8 @@ module Repo exposing (..)
 
 
 import Json.Decode as Json exposing (..)
+import Task exposing (Task)
+import Http exposing (Error)
 
 
 import MongoDb exposing (DbMsg, Collection)
@@ -21,8 +23,8 @@ repoInfoDecoder =
     ("name" := string)
 
 
-getRepoInfos : (DbMsg (Collection RepoInfo) -> msg) -> Cmd msg
-getRepoInfos msg =
-  listDocuments repoInfoDecoder msg "coll"
+getRepoInfos : Task Error (Collection RepoInfo)
+getRepoInfos =
+  listDocuments repoInfoDecoder "coll"
 
 

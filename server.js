@@ -21,7 +21,7 @@ function startElmServer() {
   app = elm.Example.worker();
   
   
-  app.ports.sendResponse.subscribe(function(response) {
+  app.ports.sendResponsePort.subscribe(function(response) {
     var reqRes = requestCache[response.idRequest];
     if (reqRes) {
       response.headers.forEach(function (header) {
@@ -39,6 +39,9 @@ function startElmServer() {
       requestCache[response.idRequest] = undefined;
   
       console.log('' + new Date().getTime() - reqRes.startTime + 'ms: ' + reqRes.req.url);
+    } else {
+      console.log("[SEVERE ERROR] Could not find request id!");
+      console.log(requestCache);
     }
   });
 }
