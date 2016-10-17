@@ -35,16 +35,25 @@ getDatabaseDescription baseUrl =
   get baseUrl mongoDbDecoder ""
 
 
-put : String -> String -> String -> (DbMsg String -> m) -> Cmd m
-put baseUrl url body msg =
+put : String -> String -> String -> Task Error String
+put baseUrl url body =
    (Http.send defaultSettings
     { verb = "PUT"
     , headers = [ ("Content-Type", "application/json") ]
     , url = baseUrl ++ url
     , body = Http.string body
     })
-    |> fromJson Json.string
-    |> perform msg
+    |> Task.mapError (\error ->
+      case error of
+        RawTimeout -> Timeout
+        RawNetworkError -> NetworkError
+    )
+    |> Task.map (\response ->
+      case response.value of
+        Text body -> body
+        _ -> ""
+    )
+    --|> fromJson Json.string
 
 
 delete decoder url =

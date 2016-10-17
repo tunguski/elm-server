@@ -6,7 +6,7 @@ import Debug
 import Dict
 import Http exposing (Error(..))
 import Json.Decode as Json exposing (..)
-import Random exposing (..)
+import RandomTask exposing (..)
 import String
 import Task exposing (Task)
 
@@ -27,33 +27,47 @@ main =
 
 type Msg 
   = SendResponse Response
---  = LoadSession (DbMsg Session)
---  | PutSession (DbMsg String)
---  | GetDb (DbMsg MongoDb)
---  | GetColl (DbMsg (Collection RepoInfo))
---  | NewSessionToken Int 
+
+
+getIdSession : Request -> String
+getIdSession request =
+  Debug.log "idSession" <|
+    case Dict.get "SESSIONID" <| getCookies request of
+      Just id -> id
+      Nothing -> "empty"
 
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg
 withSession request action =
-  let
-    idSession =
-      Debug.log "idSession" <|
-        case Dict.get "SESSIONID" <| getCookies request of
-          Just id -> id
-          Nothing -> "empty"
-  in
-    getSession idSession
-      |> processTask action
+  getSession (getIdSession request)
+    |> processTask action
+
+
+withSessionMaybe : Request -> (Error -> Msg) -> (Session -> Task Error Response) -> Partial Msg
+withSessionMaybe request errorProcessor action =
+  getSession (getIdSession request)
+    |> processTaskWithError errorProcessor action
+
+
+processTaskWithError : (x -> Msg) -> (item -> Task x Response) -> Task x item -> Partial Msg
+processTaskWithError errorProcessor eval task =
+  Task.andThen task eval
+    |> Task.perform
+         errorProcessor
+         (\item -> SendResponse item)
+    |> Command
 
 
 processTask : (item -> Task x Response) -> Task x item -> Partial Msg
 processTask eval task =
-  Task.andThen task eval
-    |> Task.perform
-         (\error -> SendResponse (statusResponse 500))
-         (\item -> SendResponse item)
-    |> Command
+  processTaskWithError
+    (\error ->
+      let
+        debug = Debug.log "error" error
+      in
+        SendResponse (statusResponse 500))
+    eval
+    task
 
 
 -- init : Request -> Partial Msg
@@ -71,7 +85,14 @@ init request =
 --        process dbMsg setBodyToString 
   
         "/api/session" ->
-          doWithSession ok
+          withSessionMaybe request
+            (\error ->
+              case error of
+                BadResponse status body ->
+                  SendResponse (statusResponse 404)
+                _ ->
+                  SendResponse (statusResponse 500)
+            ) ok
 --    ReturnSession ->
 --      case state.session of
 --        Just session ->
@@ -80,7 +101,45 @@ init request =
 --          ((response, state), cmd)
   
         "/api/session/guest" ->
-          doWithSession ok
+          getSession (getIdSession request)
+            `Task.onError` (\error ->
+              --generate NewSessionToken (Random.int minInt maxInt)
+              case error of
+                BadResponse status body ->
+--    NewSessionToken token ->
+--      let
+--        stringToken = toString token
+--        newSession = Session stringToken stringToken Nothing Nothing stringToken
+--        putResult = 
+--          ExampleDb.put ("session/" ++ stringToken) (encodeSession newSession) 
+--          PutSession
+--      in
+--        ((response, { state | session = Just newSession}), Just putResult)
+                  RandomTask.randomInt
+                    `Task.andThen` (\token ->
+                        let
+                          stringToken = toString token
+                          newSession = Session stringToken stringToken Nothing Nothing stringToken
+                        in
+                          ExampleDb.put ("session/" ++ stringToken) (Debug.log "newSession" <| encodeSession newSession) 
+                            `Task.andThen` (\s -> Task.succeed newSession)
+                    )
+                _ ->
+                  Task.fail error
+            )
+            |> Task.perform
+                 (\error ->
+                   let
+                     x = Debug.log "error" error
+                   in
+                     SendResponse (statusResponse 500))
+                 (\session -> SendResponse (okResponse (encodeSession session)))
+            |> Command
+--    404 ->
+--      \((response, state), cmds) -> 
+--        ((response, state), Just ( generate NewSessionToken (Random.int minInt maxInt) ) )
+--    _ ->
+--      returnBadResponse statusCode body
 --          (\session ->
 --            case Debug.log "session" session of
 --              Just session ->

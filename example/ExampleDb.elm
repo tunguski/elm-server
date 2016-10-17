@@ -16,7 +16,7 @@ get : (Json.Decoder item) -> String -> Task Error item
 get = MongoDb.get db
 
 
-put : String -> String -> (DbMsg String -> m) -> Cmd m
+put : String -> String -> Task Error String
 put = MongoDb.put db
 
 
