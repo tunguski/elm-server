@@ -1,67 +1,17 @@
 module Table exposing (..)
 
 
-import Date exposing (Date, fromString)
-import Json.Decode as Json exposing (..)
-import Json.Encode as JE
 import String
-import Result exposing (toMaybe)
 import Task exposing (Task)
 import Http exposing (Error)
 
 
-import MongoDb exposing (DbMsg, Collection, collectionDecoder)
+import MongoDb exposing (DbMsg, Collection, collectionDecoder, listToValue, encodeCollection, maybeEncodeDate, dateParser, encode)
 import ExampleDb exposing (..)
 import Server exposing (..)
-import Session exposing (Session)
+import SessionModel exposing (Session)
 import UrlParse exposing (..)
-
-
-type alias Table =
-  { name : String
-  , players : List String
-  }
-
-
-dateParser : Maybe String -> Maybe Date
-dateParser input =
-  case input of
-    Just text ->
-      text |> fromString >> toMaybe
-    Nothing ->
-      Nothing
-
-
-tableDecoder : Decoder Table 
-tableDecoder =
-  Json.object2 Table
-    ("name" := string)
-    ("players" := list string)
-
-
-maybeEncodeDate maybe =
-  case maybe of
-    Just date ->
-      JE.float <| Date.toTime date
-    Nothing ->
-      JE.null
-
-
-listToValue encoder list =
-  JE.list (List.map encoder list)
-
-
-tableEncoder : Table -> Value
-tableEncoder table =
-  JE.object 
-    [ ("name", JE.string table.name)
-    , ("players", listToValue JE.string table.players)
-    ]
-
-
-encodeTable : Table -> String 
-encodeTable table =
-  JE.encode 0 <| tableEncoder table
+import TableModel exposing (..)
 
 
 getTable : String -> Task Error Table
@@ -72,7 +22,7 @@ getTable idTable =
 putTable : String -> Table -> Task Error String
 putTable name table =
   put ("tables/" ++ name)
-    (JE.encode 0 <| tableEncoder table)
+    (encode tableEncoder table)
 
 
 tablesApiPart : Request
@@ -113,7 +63,7 @@ tablesApiPart request doWithSession sendResponse =
                   |> Task.perform
                        (toString >> response 500 >> sendResponse)
                        (\tables -> sendResponse (okResponse 
-                         (JE.encode 0 <| listToValue tableEncoder tables.elements)))
+                         (encodeCollection tableEncoder tables)))
                   |> Command
               _ ->
                 statusResponse 405

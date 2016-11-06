@@ -1,71 +1,16 @@
 module Session exposing (..)
 
 
-import Date exposing (Date, fromString)
-import Json.Decode as Json exposing (..)
-import Json.Encode as JE
-import Result exposing (toMaybe)
 import Task exposing (Task)
 import Http exposing (Error(..))
 import RandomTask exposing (..)
 
 
-import MongoDb exposing (DbMsg, Collection)
+import MongoDb exposing (DbMsg, Collection, maybeEncodeDate, dateParser)
 import ExampleDb exposing (..)
 import Server exposing (..)
 import UrlParse exposing (..)
-
-
-type alias Session =
-  { username : String
-  , token : String
-  , loginTime : Maybe Date
-  , lastRequestTime : Maybe Date
-  , idUser : String
-  }
-
-
-dateParser : Maybe String -> Maybe Date
-dateParser input =
-  case input of
-    Just text ->
-      text |> fromString >> toMaybe
-    Nothing ->
-      Nothing
-
-
-sessionDecoder : Decoder Session 
-sessionDecoder =
-  Json.object5 Session
-    ("username" := string)
-    ("token" := string)
-    (map dateParser <| maybe <| "loginTime" := string)
-    (map dateParser <| maybe <| "lastRequestTime" := string)
-    ("idUser" := string)
-
-
-maybeEncodeDate maybe =
-  case maybe of
-    Just date ->
-      JE.float <| Date.toTime date
-    Nothing ->
-      JE.null
-
-
-sessionEncoder : Session -> Value
-sessionEncoder session =
-  JE.object 
-    [ ("username", JE.string session.username)
-    , ("token", JE.string session.token)
-    , ("loginTime", maybeEncodeDate session.loginTime)
-    , ("lastRequestTime", maybeEncodeDate session.lastRequestTime)
-    , ("idUser", JE.string session.idUser)
-    ]
-
-
-encodeSession : Session -> String 
-encodeSession session =
-  JE.encode 0 <| sessionEncoder session
+import SessionModel exposing (..)
 
 
 getSession : String -> Task Error Session
