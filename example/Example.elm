@@ -78,7 +78,7 @@ init request =
           , tablesApiPart request doWithSession SendResponse
           , F (\() -> 
                   getRepoInfos 
-                    |> processTask succeedTask
+                    |> processTask succeedTaskToString
               )
           ]
     in
@@ -87,11 +87,6 @@ init request =
           response
         Err error ->
           Result (statusResponse 404) 
-  
-
-setCookie : String -> String -> Response -> Response
-setCookie name value response =
-  { response | headers = (name, value) :: response.headers }
 
 
 -- update : Request -> Msg -> Partial Msg

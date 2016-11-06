@@ -10,18 +10,16 @@ import Task exposing (Task)
 import Http exposing (Error)
 
 
-import MongoDb exposing (DbMsg, Collection)
+import MongoDb exposing (DbMsg, Collection, collectionDecoder)
 import ExampleDb exposing (..)
 import Server exposing (..)
+import Session exposing (Session)
 import UrlParse exposing (..)
 
 
 type alias Table =
-  { username : String
-  , token : String
-  , loginTime : Maybe Date
-  , lastRequestTime : Maybe Date
-  , idUser : String
+  { name : String
+  , players : List String
   }
 
 
@@ -36,12 +34,9 @@ dateParser input =
 
 tableDecoder : Decoder Table 
 tableDecoder =
-  Json.object5 Table
-    ("username" := string)
-    ("token" := string)
-    (map dateParser <| maybe <| "loginTime" := string)
-    (map dateParser <| maybe <| "lastRequestTime" := string)
-    ("idUser" := string)
+  Json.object2 Table
+    ("name" := string)
+    ("players" := list string)
 
 
 maybeEncodeDate maybe =
@@ -52,14 +47,15 @@ maybeEncodeDate maybe =
       JE.null
 
 
+listToValue encoder list =
+  JE.list (List.map encoder list)
+
+
 tableEncoder : Table -> Value
 tableEncoder table =
   JE.object 
-    [ ("username", JE.string table.username)
-    , ("token", JE.string table.token)
-    , ("loginTime", maybeEncodeDate table.loginTime)
-    , ("lastRequestTime", maybeEncodeDate table.lastRequestTime)
-    , ("idUser", JE.string table.idUser)
+    [ ("name", JE.string table.name)
+    , ("players", listToValue JE.string table.players)
     ]
 
 
@@ -70,11 +66,17 @@ encodeTable table =
 
 getTable : String -> Task Error Table
 getTable idTable =
-  get tableDecoder ("table/" ++ idTable)
+  get tableDecoder ("tables/" ++ idTable)
+
+
+putTable : String -> Table -> Task Error String
+putTable name table =
+  put ("tables/" ++ name)
+    (JE.encode 0 <| tableEncoder table)
 
 
 tablesApiPart : Request
-    -> ((a -> Task Error Response) -> Partial msg)
+    -> ((Session -> Task Error Response) -> Partial msg)
     -> (Response -> msg)
     -> Parse (Partial msg)
 tablesApiPart request doWithSession sendResponse =
@@ -86,18 +88,32 @@ tablesApiPart request doWithSession sendResponse =
           ]
         )
     , F (\() ->
-            case String.toLower request.method of
+            case Debug.log "method" (String.toLower request.method) of
               "post" ->
                 doWithSession (\session ->
-                  (getTable "fds")
-                    `Task.andThen` succeedTask
+                  (getTable request.body)
+                    -- create new table only if table was not found in db
+                    `Task.onError` (\error ->
+                      let
+                        table = 
+                          (Table request.body [ session.username ])
+                      in
+                        putTable request.body table
+                        `Task.andThen` (\r -> Task.succeed table)
+                    )
+                    -- if table exists, return error information that name is reserved
+
+                    -- return created table
+                    `Task.andThen` (\table -> 
+                      succeedTaskToString <| Debug.log "table" table
+                    )
                 )
               "get" -> 
-                get Json.string ("tables") 
-                  `Task.andThen` succeedTask
+                get (collectionDecoder tableDecoder) "tables"
                   |> Task.perform
-                       (\error -> sendResponse (response 500 (toString error)))
-                       (\table -> sendResponse (okResponse (toString table)))
+                       (toString >> response 500 >> sendResponse)
+                       (\tables -> sendResponse (okResponse 
+                         (JE.encode 0 <| listToValue tableEncoder tables.elements)))
                   |> Command
               _ ->
                 statusResponse 405

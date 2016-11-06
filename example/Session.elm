@@ -74,9 +74,8 @@ getSession idSession =
 
 
 sessionApiPart : Request
-    -> ((a -> Task Error Response) -> Partial msg)
+    -> ((Session -> Task Error Response) -> Partial msg)
     -> (Request -> (Error -> msg) -> (Session -> Task Error Response) -> Partial msg)
---    -> (Request -> (Session -> Task Error Response) -> Partial msg)
     -> (Response -> msg)
     -> Parse (Partial msg)
 sessionApiPart request doWithSession withSessionMaybe sendResponse =
@@ -91,9 +90,12 @@ sessionApiPart request doWithSession withSessionMaybe sendResponse =
                       `Task.andThen` (\token ->
                           let
                             stringToken = toString token
-                            newSession = Session stringToken stringToken Nothing Nothing stringToken
+                            newSession = 
+                              Session stringToken stringToken Nothing Nothing stringToken
                           in
-                            ExampleDb.put ("session/" ++ stringToken) (Debug.log "newSession" <| encodeSession newSession) 
+                            ExampleDb.put 
+                              ("session/" ++ stringToken) 
+                              (Debug.log "newSession" <| encodeSession newSession) 
                               `Task.andThen` (\s -> Task.succeed newSession)
                       )
                   _ ->
@@ -105,7 +107,13 @@ sessionApiPart request doWithSession withSessionMaybe sendResponse =
                        x = Debug.log "error" error
                      in
                        sendResponse (statusResponse 500))
-                   (\session -> sendResponse (okResponse (encodeSession session)))
+                   (\session -> 
+                     sendResponse 
+                       (setCookie "Set-Cookie" 
+                          ("SESSIONID=" ++ session.token ++ "; Path=/;")
+                          (okResponse (encodeSession session))
+                       )
+                   )
               |> Command
         )
     ]
@@ -118,6 +126,7 @@ sessionApiPart request doWithSession withSessionMaybe sendResponse =
                 _ ->
                   sendResponse (statusResponse 500)
             )
-            succeedTask
+            --succeedTask
+            (encodeSession >> okResponse >> Task.succeed)
       ) 
   ]

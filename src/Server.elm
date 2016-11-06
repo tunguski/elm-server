@@ -73,7 +73,8 @@ response status body =
   Response [] status body 
 
 
-succeedTask =
+succeedTaskToString : a -> Platform.Task error Response
+succeedTaskToString =
   (toString >> okResponse >> Task.succeed)
 
 
@@ -111,7 +112,11 @@ getHeader key request =
   List.filter (\((headerKey, value)) -> headerKey == key) request.headers
     |> List.head
     |> Maybe.map (\((k, v)) -> v)
-    
+  
+
+setCookie : String -> String -> Response -> Response
+setCookie name value response =
+  { response | headers = (name, value) :: response.headers }
 
 
 type alias Model
