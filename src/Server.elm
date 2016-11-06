@@ -4,6 +4,7 @@ import Html exposing (..)
 import Html.App as Html
 import String
 import Maybe
+import Task
 import Dict exposing (Dict, empty)
 
 
@@ -72,6 +73,10 @@ response status body =
   Response [] status body 
 
 
+succeedTask =
+  (toString >> okResponse >> Task.succeed)
+
+
 getCookies : Request -> Dict String String
 getCookies request =
   let
@@ -91,6 +96,14 @@ getCookies request =
           |> List.filterMap identity
           |> Dict.fromList
       Nothing -> Dict.empty
+
+
+getIdSession : Request -> String
+getIdSession request =
+  Debug.log "idSession" <|
+    case Dict.get "SESSIONID" <| getCookies request of
+      Just id -> id
+      Nothing -> "empty"
 
 
 getHeader : String -> Request -> Maybe String
