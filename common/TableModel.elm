@@ -6,7 +6,7 @@ import Json.Decode as Json exposing (..)
 import Json.Encode as JE
 
 
-import MongoDb exposing (DbMsg, Collection, collectionDecoder, listToValue, encodeCollection, maybeEncodeDate, dateParser)
+import BaseModel exposing (..)
 
 
 type alias Table =

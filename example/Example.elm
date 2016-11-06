@@ -13,7 +13,8 @@ import Result exposing (Result)
 import Task exposing (Task)
 
 
-import MongoDb exposing (DbMsg(..), Collection, MongoDb, getDatabaseDescription, perform)
+import BaseModel exposing (..)
+import MongoDb exposing (DbMsg(..), MongoDb)
 import Server exposing (..)
 import Session exposing (..)
 import SessionModel exposing (..)

@@ -6,7 +6,8 @@ import Task exposing (Task)
 import Http exposing (Error)
 
 
-import MongoDb exposing (DbMsg, Collection)
+import BaseModel exposing (Collection)
+import MongoDb exposing (DbMsg)
 import ExampleDb exposing (..)
 
 

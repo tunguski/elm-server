@@ -6,7 +6,7 @@ import Task exposing (Task)
 import Http exposing (Error)
 
 
-import MongoDb exposing (DbMsg, Collection, collectionDecoder, listToValue, encodeCollection, maybeEncodeDate, dateParser, encode)
+import BaseModel exposing (..)
 import ExampleDb exposing (..)
 import Server exposing (..)
 import SessionModel exposing (Session)

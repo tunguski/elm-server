@@ -6,7 +6,7 @@ import Http exposing (Error(..))
 import RandomTask exposing (..)
 
 
-import MongoDb exposing (DbMsg, Collection, maybeEncodeDate, dateParser)
+import BaseModel exposing (..)
 import ExampleDb exposing (..)
 import Server exposing (..)
 import UrlParse exposing (..)
