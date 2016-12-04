@@ -66,7 +66,7 @@ sessionApiPart request doWithSession withSessionMaybe sendResponse =
           withSessionMaybe request
             (\error ->
               case error of
-                BadResponse status body ->
+                BadResponse 404 body ->
                   sendResponse (statusResponse 404)
                 _ ->
                   sendResponse (statusResponse 500)

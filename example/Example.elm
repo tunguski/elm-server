@@ -80,7 +80,7 @@ init request =
           , tablesApiPart request doWithSession SendResponse
           , F (\() -> 
                   getRepoInfos 
-                    |> processTask succeedTaskToString
+                    |> processTask (toString >> okResponse >> Task.succeed)
               )
           ]
     in

@@ -7,12 +7,24 @@ import Json.Encode as JE
 
 
 import BaseModel exposing (..)
+import TichuModel exposing (Suit(..))
 
 
 type alias Table =
   { name : String
   , players : List String
   }
+
+
+type TableChange
+  = Fold
+  | Hand
+  | DeclareTichu String
+  | DeclareGrandTichu String
+
+
+type alias Changes =
+  List (Int TableChange)
 
 
 tableDecoder : Decoder Table 
@@ -33,5 +45,28 @@ tableEncoder table =
 encodeTable : Table -> String 
 encodeTable table =
   JE.encode 0 <| tableEncoder table
+
+
+decodeSuit : Decoder Suit
+decodeSuit =
+  let
+    decodeToType string =
+      case string of
+        "Hearts" -> Result.Ok Hearts
+        "Diamonds" -> Result.Ok Diamonds
+        "Spades" -> Result.Ok Spades
+        "Clubs" -> Result.Ok Clubs
+        _ -> Result.Err ("Not valid pattern for decoder to Suit. Pattern: " ++ (toString string))
+  in
+    customDecoder string decodeToType
+
+
+encodeSuit : Suit -> JE.Value
+encodeSuit item =
+  case item of
+    Hearts -> JE.string "Hearts"
+    Diamonds -> JE.string "Diamonds"
+    Spades -> JE.string "Spades"
+    Clubs -> JE.string "Clubs"
 
 

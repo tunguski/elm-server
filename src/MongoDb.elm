@@ -24,7 +24,7 @@ perform msg task =
 
 get : String -> (Json.Decoder item) -> String -> Task Error item
 get baseUrl decoder collection =
-  Http.get decoder (baseUrl ++ collection)
+  Http.get decoder <| Debug.log "url" (baseUrl ++ collection)
 
 
 listDocuments : String -> (Json.Decoder item) -> String -> Task Error (Collection item)

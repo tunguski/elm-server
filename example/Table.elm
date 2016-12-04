@@ -3,11 +3,11 @@ module Table exposing (..)
 
 import String
 import Task exposing (Task)
-import Http exposing (Error)
+import Http exposing (Error (BadResponse))
 
 
 import BaseModel exposing (..)
-import ExampleDb exposing (..)
+import ExampleDb as Db 
 import Server exposing (..)
 import SessionModel exposing (Session)
 import UrlParse exposing (..)
@@ -16,13 +16,25 @@ import TableModel exposing (..)
 
 getTable : String -> Task Error Table
 getTable idTable =
-  get tableDecoder ("tables/" ++ idTable)
+  Db.get (collectionDecoder tableDecoder) 
+         ("tables?filter=" ++ (("{'name':'" ++ idTable ++ "'}")))
+    `Task.andThen` (\tables ->
+      case tables.elements of
+        h :: t ->
+          Task.succeed h
+        _ ->
+          Task.fail (BadResponse 404 "") 
+    )
 
 
 putTable : String -> Table -> Task Error String
 putTable name table =
-  put ("tables/" ++ name)
+  Db.put ("tables/" ++ name)
     (encode tableEncoder table)
+
+
+andThen = flip Task.andThen
+onError = flip Task.onError
 
 
 tablesApiPart : Request
@@ -31,9 +43,24 @@ tablesApiPart : Request
     -> Parse (Partial msg)
 tablesApiPart request doWithSession sendResponse =
   P "tables" 
-    [ I (\id -> 
-          [ F (\() -> 
-                  Result (response 404 (toString id))
+    [ S (\id -> 
+          [ P "join"
+              [ F (\() -> 
+                    Result (okResponse ("[TODO] Joined: " ++ id))
+                  )
+              ]
+          , F (\() -> 
+                doWithSession (\session ->
+                  getTable id
+                    |> andThen 
+                        (encode tableEncoder >> okResponse >> Task.succeed)
+                    |> onError (\error -> 
+                        let
+                          x = Debug.log "error" error
+                        in
+                          statusResponse 404 |> Task.succeed
+                    )
+                )
               )
           ]
         )
@@ -43,7 +70,7 @@ tablesApiPart request doWithSession sendResponse =
                 doWithSession (\session ->
                   (getTable request.body)
                     -- create new table only if table was not found in db
-                    `Task.onError` (\error ->
+                    |> onError (\error ->
                       let
                         table = 
                           (Table request.body [ session.username ])
@@ -54,12 +81,11 @@ tablesApiPart request doWithSession sendResponse =
                     -- if table exists, return error information that name is reserved
 
                     -- return created table
-                    `Task.andThen` (\table -> 
-                      succeedTaskToString <| Debug.log "table" table
-                    )
+                    |> andThen 
+                        (encode tableEncoder >> okResponse >> Task.succeed)
                 )
               "get" -> 
-                get (collectionDecoder tableDecoder) "tables"
+                Db.get (collectionDecoder tableDecoder) "tables"
                   |> Task.perform
                        (toString >> response 500 >> sendResponse)
                        (\tables -> sendResponse (okResponse 
@@ -68,8 +94,7 @@ tablesApiPart request doWithSession sendResponse =
               _ ->
                 statusResponse 405
                   |> Result
-                  )
+        )
     ]
-
 
 

@@ -28,7 +28,7 @@ internal parser input =
   case parser of
     S function ->
       let
-        splitted = Debug.log "S input" <| String.split "/" input
+        splitted = String.split "/" input
       in
         case splitted of
           -- first part is "" because url started of "/"
@@ -38,7 +38,7 @@ internal parser input =
             Err "No match found"
     I function ->
       let
-        splitted = Debug.log "I input" <| String.split "/" input
+        splitted = String.split "/" input
       in
         case splitted of
           -- first part is "" because url started of "/"
@@ -60,11 +60,15 @@ internal parser input =
       case input of
         "" ->
           Ok result
+        "/" ->
+          Ok result
         _ ->
           Err "No match found"
     F function ->
       case input of
         "" ->
+          Ok (function ())
+        "/" ->
           Ok (function ())
         _ ->
           Err "No match found"

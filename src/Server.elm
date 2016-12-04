@@ -73,11 +73,6 @@ response status body =
   Response [] status body 
 
 
-succeedTaskToString : a -> Platform.Task error Response
-succeedTaskToString =
-  (toString >> okResponse >> Task.succeed)
-
-
 getCookies : Request -> Dict String String
 getCookies request =
   let
@@ -126,9 +121,9 @@ type alias Model
 -- UPDATE
 
 
-type Msg msg
+type ServerMsg msg
   = IncomingRequest Request
-  | InternalMsg String msg
+  | InternalServerMsg String msg
 
 
 port sendResponsePort : PortResponse -> Cmd msg
@@ -141,9 +136,9 @@ sendResponse request response =
 
 update : Initializer m
       -> Updater m
-      -> Msg m
+      -> ServerMsg m
       -> Model
-      -> (Model, Cmd (Msg m))
+      -> (Model, Cmd (ServerMsg m))
 update initializer updater msg model =
   case msg of
     IncomingRequest request ->
@@ -152,8 +147,8 @@ update initializer updater msg model =
           model ! [ sendResponse request response ]
         Command cmd ->
           Dict.insert request.id request model
-            ! [ Cmd.map (InternalMsg request.id) cmd ]
-    InternalMsg idRequest internalMessage ->
+            ! [ Cmd.map (InternalServerMsg request.id) cmd ]
+    InternalServerMsg idRequest internalMessage ->
       case Dict.get idRequest model of
         Just request ->
           case updater request internalMessage of
@@ -161,7 +156,7 @@ update initializer updater msg model =
               model ! [ sendResponse request response ]
             Command cmd ->
               Dict.remove request.id model
-                ! [ Cmd.map (InternalMsg idRequest) cmd ]
+                ! [ Cmd.map (InternalServerMsg idRequest) cmd ]
         Nothing ->
           Debug.crash "Illegal state"
 
@@ -172,14 +167,14 @@ port request : (Request -> msg) -> Sub msg
 -- SUBSCRIPTIONS
 
 
-subscriptions : Model -> Sub (Msg msg)
+subscriptions : Model -> Sub (ServerMsg msg)
 subscriptions model =
   request IncomingRequest
 
 
 -- VIEW
 
-view : Model -> Html (Msg msg)
+view : Model -> Html (ServerMsg msg)
 view model = text "Use the API Luke!"
 
 
