@@ -1,6 +1,7 @@
 module TichuModelJson exposing (..)
 
 
+import Array
 import Date exposing (Date)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
@@ -26,17 +27,17 @@ gameDecoder =
 round : Decoder Round
 round =
   Json.object3 Round
-    ("player" := array player)
+    ("players" := array player)
     ("table" := list (list card))
     ("actualPlayer" := int)
     
 
 card : Decoder Card
 card =
-  ("card" := string) `andThen` (\card ->
+  ("type" := string) `andThen` (\card ->
     case card of
       "NormalCard" ->
-        tuple2 
+        object2
           (\suit rank -> NormalCard suit rank)
           suit
           rank
@@ -121,7 +122,60 @@ gameEncoder : Game -> Value
 gameEncoder game =
   JE.object 
     [ ("name", JE.string game.name)
-    --, ("players", listToValue JE.string game.players)
+    , ("users", JE.array (Array.map (\(user, int) ->
+        JE.list [ userEncoder user, JE.int int ]
+      ) game.users))
+    , ("round", roundEncoder game.round)
+    , ("history", JE.list (List.map roundEncoder game.history))
+    , ("messages", JE.list (List.map messageEncoder game.messages))
+    , ("log", JE.list [])
+    ]
+
+
+messageEncoder : Message -> Value
+messageEncoder message =
+  JE.object
+    [
+    ]
+
+
+cardEncoder : Card -> Value
+cardEncoder card =
+  case card of
+    NormalCard suit rank ->
+      JE.object
+        [ ("type", JE.string "NormalCard")
+        , ("suit", JE.string <| toString suit)
+        , ("rank", JE.string <|
+            case rank of
+              R value -> toString value
+              _ -> toString rank
+          )
+        ]
+    _ ->
+      JE.object
+        [ ("type", JE.string (toString card)) ]
+
+
+playerEncoder : Player -> Value
+playerEncoder player =
+  JE.object
+    [ ("hand", listToValue cardEncoder player.hand)
+    , ("collected", listToValue cardEncoder player.collected)
+    , ("selection", listToValue cardEncoder player.selection)
+    , ("name", JE.string player.name)
+    , ("score", JE.int player.score)
+    , ("tichu", JE.bool player.tichu)
+    , ("grandTichu", JE.bool player.grandTichu)
+    ]
+
+
+roundEncoder : Round -> Value
+roundEncoder round =
+  JE.object
+    [ ("players", arrayToValue playerEncoder round.players)
+    , ("table", listToValue (List.map cardEncoder >> JE.list) round.table)
+    , ("actualPlayer", JE.int round.actualPlayer)
     ]
 
 

@@ -1,6 +1,7 @@
 module BaseModel exposing (..)
 
 
+import Array
 import Date exposing (Date, fromString, fromTime)
 import Result exposing (toMaybe)
 import Json.Decode as Json exposing (..)
@@ -37,6 +38,10 @@ listDecoder =
 
 listToValue encoder list =
   JE.list (List.map encoder list)
+
+
+arrayToValue encoder list =
+  JE.array (Array.map encoder list)
 
 
 encodeCollection encoder collection =
