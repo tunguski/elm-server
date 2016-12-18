@@ -8,7 +8,7 @@ import Http exposing (Error)
 
 import BaseModel exposing (Collection)
 import MongoDb exposing (DbMsg)
-import ExampleDb exposing (..)
+import ExampleDb exposing (db)
 
 
 type alias RepoInfo =
@@ -26,6 +26,6 @@ repoInfoDecoder =
 
 getRepoInfos : Task Error (Collection RepoInfo)
 getRepoInfos =
-  listDocuments repoInfoDecoder "coll"
+  db.listDocuments repoInfoDecoder "coll"
 
 

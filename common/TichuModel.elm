@@ -1,9 +1,13 @@
 module TichuModel exposing (..)
 
 
-import Dict exposing (Dict, empty, insert, update)
+import Time exposing (Time)
+
+
+import Array exposing (Array, initialize)
 import List exposing (..)
 import Maybe exposing (andThen)
+import UserModel exposing (User) 
 
 
 -----------------------------------------------------------------------------
@@ -149,7 +153,7 @@ type alias Player =
 
 type alias Round =
     -- players in order, first has to play
-  { players : Dict Int Player
+  { players : Array Player 
     -- hands on table
   , table : List Cards
   , actualPlayer : Int
@@ -166,10 +170,18 @@ type alias Message =
 
 
 type alias Game =
-  { round : Round
+  { name : String
+  , users : Array (User, Int)
+  , round : Round
   , history : List Round
   , messages : List Message
   , log : List UpdateGame
+  }
+
+
+type alias AwaitingTable =
+  { name : String
+  , users : List (String, Time)
   }
 
 
@@ -178,9 +190,11 @@ type UpdateGame
     | UpdateRound (Round -> Round)
 
 
-initialModel : Game
-initialModel =
-  { round = initRound allCards
+initialGame : String -> Game
+initialGame name =
+  { name = name
+  , users = Array.empty
+  , round = initRound allCards
   , history = []
   , messages = []
   , log = []
@@ -189,11 +203,7 @@ initialModel =
   
 initRound : List Card -> Round
 initRound cards =
-  { players = 
-      insert 0 (initPlayer cards 0) <|
-      insert 1 (initPlayer cards 1) <|
-      insert 2 (initPlayer cards 2) <|
-      insert 3 (initPlayer cards 3) <| empty
+  { players = initialize 4 (\i -> initPlayer cards i)
   , table = []
   , actualPlayer = 0
   }

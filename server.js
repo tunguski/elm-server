@@ -80,6 +80,7 @@ const server = http.createServer((req, res) => {
     
     app.ports.request.send({ 
       id : id, 
+      time : new Date().getTime(),
       url : req.url, 
       headers : headers,
       method : req.method,

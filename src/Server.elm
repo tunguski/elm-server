@@ -5,6 +5,7 @@ import Html.App as Html
 import String
 import Maybe
 import Task
+import Time exposing (Time)
 import Dict exposing (Dict, empty)
 
 
@@ -34,8 +35,18 @@ program initializer updater =
 -- MODEL
 
 
+type RequestMethod
+  = Get
+  | Post
+  | Put
+  | Patch
+  | Delete
+  | MalformedMethod
+
+
 type alias Request =
   { id : String
+  , time : Time
   , headers : List (String, String) 
   , url : String
   , method : String
@@ -73,6 +84,18 @@ response status body =
   Response [] status body 
 
 
+parseRequestMethod : String -> RequestMethod
+parseRequestMethod method =
+  case String.toLower method of
+    "get" -> Get
+    "post" -> Post
+    "put" -> Put
+    "patch" -> Patch
+    "delete" -> Delete
+    _ -> MalformedMethod
+
+
+
 getCookies : Request -> Dict String String
 getCookies request =
   let
@@ -96,10 +119,9 @@ getCookies request =
 
 getIdSession : Request -> String
 getIdSession request =
-  Debug.log "idSession" <|
-    case Dict.get "SESSIONID" <| getCookies request of
-      Just id -> id
-      Nothing -> "empty"
+  case Dict.get "SESSIONID" <| getCookies request of
+    Just id -> id
+    Nothing -> "empty"
 
 
 getHeader : String -> Request -> Maybe String

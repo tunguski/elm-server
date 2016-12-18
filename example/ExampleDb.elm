@@ -8,20 +8,62 @@ import Http exposing (Error)
 
 import BaseModel exposing (Collection)
 import MongoDb exposing (DbMsg)
+import UserModel exposing (..)
+import TichuModel exposing (..)
+import TichuModelJson exposing (..)
+import SessionModel exposing (..)
 
 
-db = "http://admin:changeit@localhost:8888/testdb/"
+dbUrl = "http://admin:changeit@localhost:8888/testdb/"
 
 
-get : (Json.Decoder item) -> String -> Task Error item
-get = MongoDb.get db
+db = MongoDb.createDb dbUrl
 
 
-put : String -> String -> Task Error String
-put = MongoDb.put db
+createDbCollection = MongoDb.createDbCollection dbUrl
 
 
-listDocuments : (Json.Decoder item) -> String -> Task Error (Collection item)
-listDocuments = MongoDb.listDocuments db
+onError : (x -> Task y a) -> Task x a -> Task y a
+onError fn task =
+    Task.onError task fn
+
+
+ignoreError : Task y a -> Task x a -> Task y a
+ignoreError errorTask task =
+    Task.onError task (\error -> errorTask)
+
+
+andThen : (a -> Task x b) -> Task x a -> Task x b
+andThen fn task =
+    Task.andThen task fn
+
+
+andThenReturn : Task x b -> Task x a -> Task x b
+andThenReturn fn task =
+    Task.andThen task (\result -> fn)
+
+
+games = 
+  createDbCollection "games" 
+    gameDecoder
+    gameEncoder
+
+
+awaitingTables = 
+  createDbCollection "awaitingTables" 
+    awaitingTableDecoder
+    awaitingTableEncoder
+
+
+users =
+  createDbCollection "users"
+    userDecoder
+    userEncoder
+
+
+sessions =
+  createDbCollection "session"
+    sessionDecoder
+    sessionEncoder
 
 

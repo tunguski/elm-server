@@ -12,8 +12,8 @@ import BaseModel exposing (..)
 type alias Session =
   { username : String
   , token : String
-  , loginTime : Maybe Date
-  , lastRequestTime : Maybe Date
+  , loginTime : Date
+  , lastRequestTime : Date
   , idUser : String
   }
 
@@ -23,8 +23,8 @@ sessionDecoder =
   Json.object5 Session
     ("username" := string)
     ("token" := string)
-    (map dateParser <| maybe <| "loginTime" := string)
-    (map dateParser <| maybe <| "lastRequestTime" := string)
+    (map dateParser <| "loginTime" := float)
+    (map dateParser <| "lastRequestTime" := float)
     ("idUser" := string)
 
 
@@ -33,8 +33,8 @@ sessionEncoder session =
   JE.object 
     [ ("username", JE.string session.username)
     , ("token", JE.string session.token)
-    , ("loginTime", maybeEncodeDate session.loginTime)
-    , ("lastRequestTime", maybeEncodeDate session.lastRequestTime)
+    , ("loginTime", JE.float <| Date.toTime session.loginTime)
+    , ("lastRequestTime", JE.float <| Date.toTime session.lastRequestTime)
     , ("idUser", JE.string session.idUser)
     ]
 

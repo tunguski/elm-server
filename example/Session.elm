@@ -1,6 +1,7 @@
 module Session exposing (..)
 
 
+import Date
 import Task exposing (Task)
 import Http exposing (Error(..))
 import RandomTask exposing (..)
@@ -11,11 +12,7 @@ import ExampleDb exposing (..)
 import Server exposing (..)
 import UrlParse exposing (..)
 import SessionModel exposing (..)
-
-
-getSession : String -> Task Error Session
-getSession idSession =
-  get sessionDecoder ("session/" ++ idSession)
+import UserModel exposing (..)
 
 
 sessionApiPart : Request
@@ -27,21 +24,22 @@ sessionApiPart request doWithSession withSessionMaybe sendResponse =
   P "session" 
   [ P "guest"
     [ F (\() ->
-            getSession (getIdSession request)
-              `Task.onError` (\error ->
+            sessions.get (getIdSession request)
+              |> onError (\error ->
                 case error of
                   BadResponse status body ->
                     RandomTask.randomInt
-                      `Task.andThen` (\token ->
+                      |> andThen (\token ->
                           let
                             stringToken = toString token
                             newSession = 
-                              Session stringToken stringToken Nothing Nothing stringToken
+                              Session stringToken stringToken (Date.fromTime request.time) (Date.fromTime request.time) stringToken
                           in
-                            ExampleDb.put 
-                              ("session/" ++ stringToken) 
-                              (Debug.log "newSession" <| encodeSession newSession) 
-                              `Task.andThen` (\s -> Task.succeed newSession)
+                            sessions.put stringToken newSession
+                              |> andThen (\s ->
+                                  users.put stringToken (User stringToken stringToken "guest" stringToken 1500)
+                                    |> andThenReturn (Task.succeed newSession)
+                              )
                       )
                   _ ->
                     Task.fail error

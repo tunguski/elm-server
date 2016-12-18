@@ -1,4 +1,4 @@
-module MongoDb exposing (..)
+module MongoDb exposing (DbMsg(..), Db, DbCollection, createDb, createDbCollection, perform)
 
 
 import Http exposing (..)
@@ -15,6 +15,42 @@ type DbMsg msg
   | ErrorOccurred Http.Error
 
 
+type alias Db item =
+  { getString : String -> Task Error String
+  , get : (Json.Decoder item) -> String -> Task Error item
+  , put : String -> String -> Task Error String
+  , delete : String -> Task Error String
+  , listDocuments : (Json.Decoder item) -> String -> Task Error (Collection item)
+  }
+
+
+type alias DbCollection item =
+  { get : String -> Task Error item
+  --, post : item -> Task Error String
+  , put : String -> item -> Task Error String
+  , delete : String -> Task Error String
+  , all : Task Error (Collection item)
+  --, find : String -> Task Error (Collection item)
+  }
+
+
+createDb : String -> Db item
+createDb url =
+    Db (getString url)
+       (get url)
+       (put url)
+       (delete url)
+       (listDocuments url)
+
+
+createDbCollection : String -> String -> Json.Decoder item -> (item -> JE.Value) -> DbCollection item
+createDbCollection url name decoder encoder =
+    DbCollection (get (url ++ name ++ "/") decoder)
+                 (\id item -> put (url ++ name ++ "/") id (JE.encode 2 <| encoder item))
+                 (delete (url ++ name ++ "/"))
+                 (listDocuments url decoder name)
+
+
 perform : (DbMsg value -> m) -> Task Error value -> Cmd m
 perform msg task = 
   task
@@ -25,6 +61,11 @@ perform msg task =
 get : String -> (Json.Decoder item) -> String -> Task Error item
 get baseUrl decoder collection =
   Http.get decoder <| Debug.log "url" (baseUrl ++ collection)
+
+
+getString : String -> String -> Task Error String
+getString baseUrl collection =
+  Http.getString <| Debug.log "url" (baseUrl ++ collection)
 
 
 listDocuments : String -> (Json.Decoder item) -> String -> Task Error (Collection item)
@@ -58,14 +99,23 @@ put baseUrl url body =
     --|> fromJson Json.string
 
 
-delete decoder url =
-   fromJson decoder <|
-   Http.send defaultSettings
+delete baseUrl url =
+   (Http.send defaultSettings
     { verb = "DELETE"
     , headers = []
-    , url = url
+    , url = baseUrl ++ url
     , body = empty
-    }
+    })
+    |> Task.mapError (\error ->
+      case error of
+        RawTimeout -> Timeout
+        RawNetworkError -> NetworkError
+    )
+    |> Task.map (\response ->
+      case response.value of
+        Text body -> body
+        _ -> ""
+    )
 
 
 type alias MongoDb =

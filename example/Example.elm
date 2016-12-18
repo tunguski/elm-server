@@ -14,11 +14,12 @@ import Task exposing (Task)
 
 
 import BaseModel exposing (..)
-import MongoDb exposing (DbMsg(..), MongoDb)
+import MongoDb exposing (DbMsg(..))
 import Server exposing (..)
 import Session exposing (..)
 import SessionModel exposing (..)
 import Table exposing (..)
+import AwaitingTable exposing (..)
 import Repo exposing (..)
 import UrlParse exposing (..)
 import ExampleDb exposing (..)
@@ -37,13 +38,13 @@ type Msg
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg
 withSession request action =
-  getSession (getIdSession request)
+  sessions.get (getIdSession request)
     |> processTask action
 
 
 withSessionMaybe : Request -> (Error -> Msg) -> (Session -> Task Error Response) -> Partial Msg
 withSessionMaybe request errorProcessor action =
-  getSession (getIdSession request)
+  sessions.get (getIdSession request)
     |> processTaskWithError errorProcessor action
 
 
@@ -68,6 +69,39 @@ processTask eval task =
     task
 
 
+requiredTables =
+  [ "session"
+  , "users"
+  , "games"
+  , "awaitingTables"
+  , "archiveGames"
+  ]
+
+
+createDbCollection name =
+  db.getString name |> ignoreError (db.put name "")
+
+
+performBatch tasks =
+  Task.sequence tasks
+  |> Task.perform
+       (toString >> response 500 >> SendResponse)
+       (toString >> okResponse >> SendResponse)
+  |> Command
+
+
+initDb =
+  performBatch 
+    (List.map createDbCollection requiredTables)
+
+
+eraseDb =
+  performBatch <|
+    (List.map db.delete requiredTables)
+    ++
+    (List.map createDbCollection requiredTables)
+
+
 -- init : Request -> Partial Msg
 init : Initializer Msg
 init request =
@@ -78,6 +112,11 @@ init request =
         P "api"
           [ sessionApiPart request doWithSession withSessionMaybe SendResponse
           , tablesApiPart request doWithSession SendResponse
+          , awaitingTablesApiPart request doWithSession SendResponse
+          , P "init"
+            [ F (\() -> initDb) ]
+          , P "eraseDb"
+            [ F (\() -> eraseDb) ]
           , F (\() -> 
                   getRepoInfos 
                     |> processTask (toString >> okResponse >> Task.succeed)

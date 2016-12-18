@@ -1,7 +1,7 @@
 module BaseModel exposing (..)
 
 
-import Date exposing (Date, fromString)
+import Date exposing (Date, fromString, fromTime)
 import Result exposing (toMaybe)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
@@ -19,7 +19,15 @@ collectionDecoder itemDecoder =
   Json.object3 Collection 
     ("_id" := Json.string) 
     (maybe ("desc" := Json.string))
-    (at ["_embedded", "rh:doc"] <| Json.list itemDecoder)
+    (("_returned" := Json.int)
+     `andThen`
+     (\count ->
+       case count of
+         0 ->
+           succeed []
+         _ ->
+           (at ["_embedded", "rh:doc"] <| Json.list itemDecoder)
+    ))
 
 
 listDecoder : Decoder item -> Decoder (List item)
@@ -47,12 +55,8 @@ maybeEncodeDate maybe =
       JE.null
 
 
-dateParser : Maybe String -> Maybe Date
+dateParser : Float -> Date
 dateParser input =
-  case input of
-    Just text ->
-      text |> fromString >> toMaybe
-    Nothing ->
-      Nothing
+  fromTime input
 
 
