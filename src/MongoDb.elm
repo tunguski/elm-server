@@ -2,12 +2,16 @@ module MongoDb exposing (DbMsg(..), Db, DbCollection, createDb, createDbCollecti
 
 
 import Http exposing (..)
-import Task exposing (Task)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
-import String exposing (concat)
 import Platform.Cmd as Cmd
+import Result exposing (Result(..))
+import String exposing (concat)
+import Task exposing (Task)
+
+
 import BaseModel exposing (Collection, collectionDecoder)
+import Rest 
 
 
 type DbMsg msg
@@ -51,16 +55,21 @@ createDbCollection url name decoder encoder =
                  (listDocuments url decoder name)
 
 
+mapRestMsg msg =
+  case msg of
+    Ok value ->
+      DataFetched value
+    Err error ->
+      ErrorOccurred error
+
+
 perform : (DbMsg value -> m) -> Task Error value -> Cmd m
 perform msg task = 
-  task
-    |> Task.perform ErrorOccurred DataFetched
-    |> Cmd.map msg
+  Rest.perform (mapRestMsg >> msg) task
 
 
 get : String -> (Json.Decoder item) -> String -> Task Error item
-get baseUrl decoder collection =
-  Http.get decoder <| Debug.log "url" (baseUrl ++ collection)
+get = Rest.get
 
 
 getString : String -> String -> Task Error String
@@ -79,43 +88,10 @@ getDatabaseDescription baseUrl =
 
 
 put : String -> String -> String -> Task Error String
-put baseUrl url body =
-   (Http.send defaultSettings
-    { verb = "PUT"
-    , headers = [ ("Content-Type", "application/json") ]
-    , url = baseUrl ++ url
-    , body = Http.string body
-    })
-    |> Task.mapError (\error ->
-      case error of
-        RawTimeout -> Timeout
-        RawNetworkError -> NetworkError
-    )
-    |> Task.map (\response ->
-      case response.value of
-        Text body -> body
-        _ -> ""
-    )
-    --|> fromJson Json.string
+put = Rest.put
 
 
-delete baseUrl url =
-   (Http.send defaultSettings
-    { verb = "DELETE"
-    , headers = []
-    , url = baseUrl ++ url
-    , body = empty
-    })
-    |> Task.mapError (\error ->
-      case error of
-        RawTimeout -> Timeout
-        RawNetworkError -> NetworkError
-    )
-    |> Task.map (\response ->
-      case response.value of
-        Text body -> body
-        _ -> ""
-    )
+delete = Rest.delete
 
 
 type alias MongoDb =
