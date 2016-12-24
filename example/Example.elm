@@ -1,6 +1,5 @@
 module Example exposing (..)
 
-
 import Base64
 import Debug
 import Json.Decode as JD
@@ -13,128 +12,139 @@ import Result exposing (Result)
 import Task exposing (Task)
 
 
+import AwaitingTable exposing (..)
 import BaseModel exposing (..)
-import MongoDb exposing (DbMsg(..))
+import ExampleDb exposing (..)
+import MongoDb exposing (..)
+import Repo exposing (..)
+import Rest exposing (..)
 import Server exposing (..)
 import Session exposing (..)
 import SessionModel exposing (..)
 import Table exposing (..)
-import AwaitingTable exposing (..)
-import Repo exposing (..)
 import UrlParse exposing (..)
-import ExampleDb exposing (..)
 
 
 main =
-  Server.program init update
+    Server.program init update
 
 
 -- UPDATE
 
 
-type Msg 
-  = SendResponse Response
+type Msg
+    = SendResponse Response
 
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg
 withSession request action =
-  sessions.get (getIdSession request)
+    get (getIdSession request) sessions
     |> processTask action
 
 
 withSessionMaybe : Request -> (Error -> Msg) -> (Session -> Task Error Response) -> Partial Msg
 withSessionMaybe request errorProcessor action =
-  sessions.get (getIdSession request)
+    get (getIdSession request) sessions
     |> processTaskWithError errorProcessor action
 
 
 processTaskWithError : (x -> Msg) -> (item -> Task x Response) -> Task x item -> Partial Msg
 processTaskWithError errorProcessor eval task =
-  Task.andThen task eval
-    |> Task.perform
-         errorProcessor
-         SendResponse
-    |> Command
+    Task.andThen eval task
+        |> Task.attempt
+            (\result ->
+                case result of
+                    Ok response ->
+                        SendResponse response
+                    Err error ->
+                        errorProcessor error
+            )
+        |> Command
 
 
 processTask : (item -> Task x Response) -> Task x item -> Partial Msg
 processTask eval task =
-  processTaskWithError
-    (\error ->
-      let
-        debug = Debug.log "error" error
-      in
-        SendResponse (statusResponse 500))
-    eval
-    task
+    processTaskWithError
+        (\error ->
+            let
+                debug =
+                    Debug.log "error" error
+            in
+                SendResponse (statusResponse 500)
+        )
+        eval
+        task
 
 
 requiredTables =
-  [ "session"
-  , "users"
-  , "games"
-  , "awaitingTables"
-  , "archiveGames"
-  ]
-
-
-createDbCollection name =
-  db.getString name |> ignoreError (db.put name "")
+    [ collectionUrl sessions
+    , collectionUrl users
+    , collectionUrl games
+    , collectionUrl awaitingTables
+    --, collectionUrl archiveGames
+    ]
 
 
 performBatch tasks =
-  Task.sequence tasks
-  |> Task.perform
-       (toString >> response 500 >> SendResponse)
-       (toString >> okResponse >> SendResponse)
-  |> Command
+    Task.sequence tasks
+        |> Task.attempt
+            (\result ->
+                case result of
+                    Ok data ->
+                        data |> (toString >> okResponse >> SendResponse)
+                    Err error ->
+                        error |> (toString >> response 500 >> SendResponse)
+            )
+        |> Command
 
 
-initDb =
-  performBatch 
-    (List.map createDbCollection requiredTables)
+initDb : () -> Partial Msg 
+initDb _ =
+   performBatch
+        (List.map createCollection requiredTables)
 
 
-eraseDb =
-  performBatch <|
-    (List.map db.delete requiredTables)
-    ++
-    (List.map createDbCollection requiredTables)
+eraseDb : () -> Partial Msg
+eraseDb _ =
+    performBatch <|
+        (List.map deleteCollection requiredTables)
+        ++ (List.map createCollection requiredTables)
 
 
 -- init : Request -> Partial Msg
+
+
 init : Initializer Msg
 init request =
     let
-      doWithSession = withSession request
-      -- serialize provided object and return it as successful task response with status 200
-      restMap =
-        P "api"
-          [ sessionApiPart request doWithSession withSessionMaybe SendResponse
-          , tablesApiPart request doWithSession SendResponse
-          , awaitingTablesApiPart request doWithSession SendResponse
-          , P "init"
-            [ F (\() -> initDb) ]
-          , P "eraseDb"
-            [ F (\() -> eraseDb) ]
-          , F (\() -> 
-                  getRepoInfos 
-                    |> processTask (toString >> okResponse >> Task.succeed)
-              )
-          ]
+        doWithSession =
+            withSession request
+
+        -- serialize provided object and return it as successful task response with status 200
+        restMap =
+            P "api"
+                [ sessionApiPart request doWithSession withSessionMaybe SendResponse
+                , tablesApiPart request doWithSession SendResponse
+                , awaitingTablesApiPart request doWithSession SendResponse
+                , P "init"
+                    [ F initDb ]
+                , P "eraseDb"
+                    [ F eraseDb ]
+                ]
     in
-      case parse restMap request.url of
-        Ok response ->
-          response
-        Err error ->
-          Result (statusResponse 404) 
+        case parse restMap request.url of
+            Ok response ->
+                response
+
+            Err error ->
+                Result (statusResponse 404)
 
 
 -- update : Request -> Msg -> Partial Msg
 update : Updater Msg
 update request msg =
-  case Debug.log "update msg" msg of
-    SendResponse response -> 
-      Result response
+    case Debug.log "update msg" msg of
+        SendResponse response ->
+            Result response
 
 

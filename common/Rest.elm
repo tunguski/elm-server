@@ -1,7 +1,7 @@
 module Rest exposing (..)
 
-
-import Http exposing (..)
+import Http exposing (Error)
+import HttpBuilder exposing (..)
 import Json.Decode as Json
 import Json.Encode as JE
 import Platform.Cmd as Cmd
@@ -10,85 +10,88 @@ import String exposing (concat)
 import Task exposing (Task)
 
 
-type alias RestMsg msg
-  = Result Http.Error msg
+type alias RestResult item =
+  Result Error item
 
 
-type alias RestCollection item =
-  { get : String -> Task Error item
-  , post : String -> item -> Task Error String
-  , postCommand : String -> Task Error String
-  , put : String -> item -> Task Error String
-  , delete : String -> Task Error String
-  , all : Task Error (List item)
-  --, find : String -> Task Error (Collection item)
-  }
+type Rest item =
+  Rest String String (Json.Decoder item) (item -> JE.Value)
 
 
-restCollection : String -> String -> Json.Decoder item -> (item -> JE.Value) -> RestCollection item
-restCollection url name decoder encoder =
-  let
-    compositeUrl = url ++ name ++ "/"
-    encode = encoder >> JE.encode 2
-  in
-    RestCollection 
-      (get compositeUrl decoder)
-      (\id item -> post compositeUrl id (encode item))
-      (\id -> post compositeUrl id "")
-      (\id item -> put compositeUrl id (encode item))
-      (delete compositeUrl)
-      (findAll url decoder name)
+restCollection : String -> String -> Json.Decoder item -> (item -> JE.Value) -> Rest item
+restCollection = Rest
 
 
-perform : (RestMsg value -> m) -> Task Error value -> Cmd m
-perform msg task = 
-  task
-    |> Task.perform Err Ok
-    |> Cmd.map msg
+ignoreError : Task y a -> Task x a -> Task y a
+ignoreError errorTask task =
+    Task.onError (\error -> errorTask) task
 
 
-get : String -> (Json.Decoder item) -> String -> Task Error item
-get baseUrl decoder collection =
-  Http.get decoder <| Debug.log "url" (baseUrl ++ collection)
+andThenReturn : Task x b -> Task x a -> Task x b
+andThenReturn fn task =
+    Task.andThen (\result -> fn) task
 
 
-findAll : String -> (Json.Decoder item) -> String -> Task Error (List item)
-findAll baseUrl decoder collection =
-  get baseUrl (Json.list decoder) collection
+get : String -> Rest item -> Task Error item
+get itemId rest =
+  case rest of
+    Rest baseUrl collectionName decoder encoder ->
+      HttpBuilder.get (baseUrl ++ collectionName ++ "/" ++ itemId)
+      |> withExpect (Http.expectJson decoder)
+      |> toTask
+--    Http.get (Debug.log "url" (baseUrl ++ collection)) decoder
+--        |> Http.toTask
 
 
-post : String -> String -> String -> Task Error String
-post baseUrl id body =
-  doSend "POST" [ ("Content-Type", "application/json") ] baseUrl id body
+findAll : Rest item -> Task Error (List item)
+findAll rest =
+  case rest of
+    Rest baseUrl collectionName decoder encoder ->
+      HttpBuilder.get (baseUrl ++ collectionName)
+      |> withExpect (Http.expectJson (Json.list decoder))
+      |> toTask
+--    get baseUrl (Json.list decoder) collection
 
 
-put : String -> String -> String -> Task Error String
-put baseUrl id body =
-  doSend "PUT" [ ("Content-Type", "application/json") ] baseUrl id body
+post : String -> item -> Rest item -> Task Error String
+post itemId item rest =
+  case rest of
+    Rest baseUrl collectionName decoder encoder ->
+      HttpBuilder.post (baseUrl ++ collectionName)
+      |> withExpect Http.expectString
+      |> withHeader "Content-Type" "application/json"
+      |> withJsonBody (encoder item)
+      |> toTask
+--    doSend "POST" [ ( "Content-Type", "application/json" ) ] baseUrl id body
 
 
-delete : String -> String -> Task Error String
-delete baseUrl url =
-  doSend "DELETE" [] baseUrl url ""
+postCommand : String -> Rest item -> Task Error String
+postCommand command rest =
+  case rest of
+    Rest baseUrl collectionName decoder encoder ->
+      HttpBuilder.post (baseUrl ++ collectionName ++ "/" ++ command)
+      |> withExpect Http.expectString
+      |> withHeader "Content-Type" "application/json"
+      |> toTask
 
 
-doSend : String -> List (String, String) -> String -> String -> String -> Task Error String
-doSend method headers baseUrl url body =
-   (Http.send defaultSettings
-    { verb = method 
-    , headers = headers 
-    , url = baseUrl ++ url
-    , body = Http.string body 
-    })
-    |> Task.mapError (\error ->
-      case error of
-        RawTimeout -> Timeout
-        RawNetworkError -> NetworkError
-    )
-    |> Task.map (\response ->
-      case response.value of
-        Text body -> body
-        _ -> ""
-    )
+put : String -> item -> Rest item -> Task Error String
+put itemId item rest =
+  case rest of
+    Rest baseUrl collectionName decoder encoder ->
+      HttpBuilder.put (baseUrl ++ collectionName)
+      |> withExpect Http.expectString
+      |> withHeader "Content-Type" "application/json"
+      |> withJsonBody (encoder item)
+      |> toTask
+--    doSend "PUT" [ ( "Content-Type", "application/json" ) ] baseUrl id body
 
 
+delete : String -> Rest item -> Task Error String
+delete itemId rest =
+  case rest of
+    Rest baseUrl collectionName decoder encoder ->
+      HttpBuilder.delete (baseUrl ++ collectionName ++ "/" ++ itemId)
+      |> withExpect Http.expectString
+      |> toTask
+--    doSend "DELETE" [] baseUrl url ""

@@ -2,119 +2,153 @@ module AwaitingTable exposing (..)
 
 
 import String
-import Task exposing (Task)
+import Task exposing (..)
 import Time exposing (second)
-import Http exposing (Error (BadResponse))
+import Http exposing (Error)
 
 
 import BaseModel exposing (..)
-import ExampleDb exposing (..) 
+import ExampleDb exposing (..)
+import MongoDb exposing (..)
+import Rest exposing (..)
 import Server exposing (..)
 import SessionModel exposing (Session)
-import UserModel exposing (..)
-import UrlParse exposing (..)
 import TichuModel exposing (..)
 import TichuModelJson exposing (..)
+import UserModel exposing (..)
+import UrlParse exposing (..)
 
 
-awaitingTablesApiPart : Request
+awaitingTablesApiPart :
+    Request
     -> ((Session -> Task Error Response) -> Partial msg)
     -> (Response -> msg)
     -> Parse (Partial msg)
 awaitingTablesApiPart request doWithSession sendResponse =
-  P "awaitingTables" 
-    [ S (\id -> 
-          [ F (\() -> 
-                case parseRequestMethod request.method of
-                  Get ->
-                    doWithSession (\session ->
-                      awaitingTables.get id
-                        |> andThen 
-                            (\table ->
-                              awaitingTables.put id { table | users =
-                                List.map (\user ->
-                                  case user of
-                                    (name, time) ->
-                                      if name /= session.username then user else (name, request.time)
-                                ) table.users
-                              }
-                              |> andThenReturn
-                                  (table |> (encode awaitingTableEncoder >> okResponse >> Task.succeed))
-                            )
-                        |> onError (\error -> 
-                            let
-                              x = Debug.log "error" error
-                            in
-                              statusResponse 404 |> Task.succeed
+    P "awaitingTables"
+        [ S
+            (\id ->
+                [ F
+                    (\() ->
+                        case parseRequestMethod request.method of
+                            Get ->
+                                doWithSession
+                                    (\session ->
+                                        get id awaitingTables
+                                            |> andThen
+                                                (\table ->
+                                                    put id 
+                                                        { table
+                                                            | users =
+                                                                List.map
+                                                                    (\user ->
+                                                                        case user of
+                                                                            ( name, time ) ->
+                                                                                if name /= session.username then
+                                                                                    user
+                                                                                else
+                                                                                    ( name, request.time )
+                                                                    )
+                                                                    table.users
+                                                        } awaitingTables
+                                                        |> andThenReturn
+                                                            (table |> (encode awaitingTableEncoder >> okResponse >> Task.succeed))
+                                                )
+                                            |> onError
+                                                (\error ->
+                                                    let
+                                                        x =
+                                                            Debug.log "error" error
+                                                    in
+                                                        statusResponse 404 |> Task.succeed
+                                                )
+                                    )
+
+                            Post ->
+                                doWithSession
+                                    (\session ->
+                                        (get id awaitingTables)
+                                            -- create new table only if table was not found in db
+                                            |>
+                                                onError
+                                                    (\error ->
+                                                        let
+                                                            table =
+                                                                AwaitingTable id
+                                                                    [ ( session.username, request.time ) ]
+                                                        in
+                                                            put id table awaitingTables
+                                                                |> andThenReturn (Task.succeed table)
+                                                    )
+                                            -- if table exists, return error information that name is reserved
+                                            -- return created table
+                                            |>
+                                                andThen
+                                                    (encode awaitingTableEncoder >> okResponse >> Task.succeed)
+                                    )
+
+                            _ ->
+                                statusResponse 405
+                                    |> Result
+                    )
+                , P "join"
+                    [ F
+                        (\() ->
+                            Result (okResponse ("[TODO] Joined: " ++ id))
                         )
-                    )
-                  Post ->
-                    doWithSession (\session ->
-                      (awaitingTables.get id)
-                        -- create new table only if table was not found in db
-                        |> onError (\error ->
-                          let
-                            table = 
-                              AwaitingTable id 
-                                [ (session.username, request.time) ]
-                          in
-                            awaitingTables.put id table
-                            |> andThenReturn (Task.succeed table)
-                        )
-                        -- if table exists, return error information that name is reserved
-    
-                        -- return created table
-                        |> andThen 
-                            (encode awaitingTableEncoder >> okResponse >> Task.succeed)
-                    )
-                  _ ->
-                    statusResponse 405
-                      |> Result
-              )
-          , P "join"
-              [ F (\() -> 
-                    Result (okResponse ("[TODO] Joined: " ++ id))
-                  )
-              ]
-          ]
-        )
-    , F (\() ->
-          awaitingTables.all
-            |> andThen (\tables ->
-                let
-                  toUpdate = 
-                    List.filter 
-                      (.users >> List.any (\(name, time) -> (time + (5 * second) < request.time))) 
-                      tables.elements
-                  updated =
-                    List.map 
-                      (\table -> 
-                        { table | users = 
-                            List.filter (\(name, time) -> (time + (5 * second) > request.time)) table.users })
-                      toUpdate
-                  toRemove = 
-                    (List.filter (.users >> List.isEmpty) tables.elements)
-                    ++
-                    (List.filter (.users >> List.isEmpty) updated)
-                in
-                  Task.sequence 
-                    ((List.map (\table -> awaitingTables.delete table.name) toRemove)
-                     ++
-                     (updated
-                      |> List.filter (.users >> List.isEmpty >> not)
-                      |> List.map (\table -> awaitingTables.put table.name table)
-                     )
-                    )
-                    |> andThen (\r ->
-                      awaitingTables.all
-                    )
+                    ]
+                ]
             )
-            |> Task.perform
-                 (toString >> response 500 >> sendResponse)
-                 (\tables -> sendResponse (okResponse 
-                   (encodeCollection awaitingTableEncoder tables)))
-            |> Command
-        )
-    ]
+        , F
+            (\() ->
+                listDocuments awaitingTables
+                    |> andThen
+                        (\tables ->
+                            let
+                                toUpdate =
+                                    List.filter
+                                        (.users >> List.any (\( name, time ) -> (time + (5 * second) < request.time)))
+                                        tables.elements
+
+                                updated =
+                                    List.map
+                                        (\table ->
+                                            { table
+                                                | users =
+                                                    List.filter (\( name, time ) -> (time + (5 * second) > request.time)) table.users
+                                            }
+                                        )
+                                        toUpdate
+
+                                toRemove =
+                                    (List.filter (.users >> List.isEmpty) tables.elements)
+                                        ++ (List.filter (.users >> List.isEmpty) updated)
+                            in
+                                Task.sequence
+                                    ((List.map (\table -> delete table.name awaitingTables) toRemove)
+                                        ++ (updated
+                                                |> List.filter (.users >> List.isEmpty >> not)
+                                                |> List.map (\table -> put table.name table awaitingTables)
+                                           )
+                                    )
+                                    |> andThen
+                                        (\r ->
+                                            listDocuments awaitingTables
+                                        )
+                        )
+                    |> Task.attempt
+                        (\result ->
+                            case result of
+                                Ok tables ->
+                                    sendResponse
+                                        (okResponse
+                                            (encodeCollection awaitingTableEncoder tables)
+                                        )
+                                Err error ->
+                                  (error |> toString >> response 500 >> sendResponse)
+                        )
+                    |> Command
+            )
+        ]
 
 
