@@ -1,4 +1,4 @@
-module Rest exposing (..)
+module Rest exposing (RestResult, Rest, RestConfig, restCollection, config, ignoreError, andThenReturn, get, findAll, post, postCommand, put, delete)
 
 import Http exposing (Error)
 import HttpBuilder exposing (..)
@@ -11,15 +11,31 @@ import Task exposing (Task)
 
 
 type alias RestResult item =
-  Result Error item
+    Result Error item
 
 
 type Rest item =
-  Rest String String (Json.Decoder item) (item -> JE.Value)
+    Rest (RestConfig item) (List (RequestBuilder item -> RequestBuilder item))
+
+
+type alias RestConfig item =
+    { baseUrl : String
+    , collectionName : String
+    , decoder : Json.Decoder item
+    , encoder : item -> JE.Value
+    }
 
 
 restCollection : String -> String -> Json.Decoder item -> (item -> JE.Value) -> Rest item
-restCollection = Rest
+restCollection baseUrl collectionName decoder encoder = 
+    Rest (RestConfig baseUrl collectionName decoder encoder) []
+
+
+config : Rest item -> RestConfig item
+config rest =
+    case rest of
+        Rest config modifiers ->
+            config
 
 
 ignoreError : Task y a -> Task x a -> Task y a
@@ -32,66 +48,84 @@ andThenReturn fn task =
     Task.andThen (\result -> fn) task
 
 
+withHeader : String -> String -> Rest item -> Rest item 
+withHeader key value rest = 
+    case rest of
+        Rest config modifiers ->
+            Rest config (modifiers ++ [ HttpBuilder.withHeader key value ])
+
+
+apply : List (RequestBuilder item -> RequestBuilder item) -> RequestBuilder item -> RequestBuilder item 
+apply modifiers builder =
+    -- fold all modifiers
+    List.foldl (\modifier b ->
+        modifier b
+    ) builder modifiers 
+
+
+baseQuery : Rest item -> (RestConfig item -> RequestBuilder item -> RequestBuilder a) -> Task Error a
+baseQuery rest custom =
+  case rest of
+    Rest config modifiers ->
+      HttpBuilder.get (config.baseUrl ++ config.collectionName)
+      |> withExpect (Http.expectJson config.decoder)
+      |> apply modifiers
+      |> custom config
+      |> toTask
+
+
+withMethod method builder =
+    { builder | method = method }
+
+
+subResource name builder =
+    { builder | url = builder.url ++ "/" ++ name }
+
+
 get : String -> Rest item -> Task Error item
 get itemId rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.get (baseUrl ++ collectionName ++ "/" ++ itemId)
-      |> withExpect (Http.expectJson decoder)
-      |> toTask
---    Http.get (Debug.log "url" (baseUrl ++ collection)) decoder
---        |> Http.toTask
+  baseQuery rest (\config -> 
+    subResource itemId)
 
 
 findAll : Rest item -> Task Error (List item)
 findAll rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.get (baseUrl ++ collectionName)
-      |> withExpect (Http.expectJson (Json.list decoder))
-      |> toTask
---    get baseUrl (Json.list decoder) collection
+    baseQuery rest 
+        (withExpect << Http.expectJson << Json.list << .decoder) 
 
 
 post : String -> item -> Rest item -> Task Error String
 post itemId item rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.post (baseUrl ++ collectionName)
-      |> withExpect Http.expectString
-      |> withHeader "Content-Type" "application/json"
-      |> withJsonBody (encoder item)
-      |> toTask
---    doSend "POST" [ ( "Content-Type", "application/json" ) ] baseUrl id body
+    baseQuery rest (\config -> 
+        withMethod "post"
+        >> withJsonBody (config.encoder item)
+        >> HttpBuilder.withHeader "Content-Type" "application/json"
+        >> withExpect Http.expectString)
 
 
 postCommand : String -> Rest item -> Task Error String
 postCommand command rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.post (baseUrl ++ collectionName ++ "/" ++ command)
-      |> withExpect Http.expectString
-      |> withHeader "Content-Type" "application/json"
-      |> toTask
+    baseQuery rest (\config -> 
+        subResource command
+        >> withMethod "post"
+        >> HttpBuilder.withHeader "Content-Type" "application/json"
+        >> withExpect Http.expectString)
 
 
 put : String -> item -> Rest item -> Task Error String
 put itemId item rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.put (baseUrl ++ collectionName)
-      |> withExpect Http.expectString
-      |> withHeader "Content-Type" "application/json"
-      |> withJsonBody (encoder item)
-      |> toTask
---    doSend "PUT" [ ( "Content-Type", "application/json" ) ] baseUrl id body
+    baseQuery rest (\config -> 
+        withMethod "put"
+        >> withJsonBody (config.encoder item)
+        >> HttpBuilder.withHeader "Content-Type" "application/json"
+        >> withExpect Http.expectString)
 
 
 delete : String -> Rest item -> Task Error String
 delete itemId rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.delete (baseUrl ++ collectionName ++ "/" ++ itemId)
-      |> withExpect Http.expectString
-      |> toTask
---    doSend "DELETE" [] baseUrl url ""
+    baseQuery rest (\config -> 
+        subResource itemId
+        >> withMethod "delete"
+        >> withExpect Http.expectString)
+
+

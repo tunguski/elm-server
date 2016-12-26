@@ -16,10 +16,12 @@ type CollectionUrl =
   CollectionUrl String String
 
 
+collectionUrl : Rest item -> CollectionUrl
 collectionUrl rest =
-  case rest of
-    Rest baseUrl name decoder encoder ->
-      CollectionUrl baseUrl name
+    let
+        conf = config rest
+    in
+        CollectionUrl conf.baseUrl conf.collectionName
 
 
 getCollection : CollectionUrl -> Task Error String
@@ -56,23 +58,22 @@ createCollection rest =
 
 getString : String -> Rest item -> Task Error String
 getString itemId rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.get (baseUrl ++ collectionName ++ "/" ++ itemId)
-      |> withExpect Http.expectString
-      |> toTask
---    Http.getString (Debug.log "url" (baseUrl ++ collection))
---      |> Http.toTask
+    let
+        conf = config rest
+    in
+        HttpBuilder.get (conf.baseUrl ++ conf.collectionName ++ "/" ++ itemId)
+        |> withExpect Http.expectString
+        |> toTask
 
 
 listDocuments : Rest item -> Task Error (Collection item)
 listDocuments rest =
-  case rest of
-    Rest baseUrl collectionName decoder encoder ->
-      HttpBuilder.get (baseUrl ++ collectionName)
-      |> withExpect (Http.expectJson (collectionDecoder decoder))
-      |> toTask
---    Rest.get baseUrl (collectionDecoder decoder) collection
+    let
+        conf = config rest
+    in
+        HttpBuilder.get (conf.baseUrl ++ conf.collectionName)
+        |> withExpect (Http.expectJson (collectionDecoder conf.decoder))
+        |> toTask
 
 
 type alias MongoDb =
