@@ -4,6 +4,9 @@ import Date
 import Dict
 import Task exposing (..)
 import Http exposing (Error(..))
+
+
+import ApiPartApi exposing (..)
 import RandomTask exposing (..)
 import BaseModel exposing (..)
 import ExampleDb exposing (..)
@@ -15,29 +18,27 @@ import UserModel exposing (..)
 
 
 sessionApiPart :
-    Request
-    -> ((Session -> Task Error Response) -> Partial msg)
+    ApiPartApi msg
     -> (Request -> (Error -> msg) -> (Session -> Task Error Response) -> Partial msg)
-    -> (Response -> msg)
     -> Parse (Partial msg)
-sessionApiPart request doWithSession withSessionMaybe sendResponse =
+sessionApiPart api withSessionMaybe =
     P "session"
         [ P "guest"
-            [ F (\() -> getGuestSession request doWithSession withSessionMaybe sendResponse)
+            [ F (\() -> getGuestSession api withSessionMaybe)
             ]
         , F
             (\() ->
-                withSessionMaybe request
+                withSessionMaybe api.request
                     (\error ->
                         case error of
                             BadStatus response ->
                                 case response.status.code of
                                     404 ->
-                                      sendResponse (statusResponse 404)
+                                      api.sendResponse (statusResponse 404)
                                     code ->
-                                      sendResponse (statusResponse code)
+                                      api.sendResponse (statusResponse code)
                             _ ->
-                                sendResponse (statusResponse 500)
+                                api.sendResponse (statusResponse 500)
                     )
                     --succeedTask
                     (encodeSession >> okResponse >> Task.succeed)
@@ -51,24 +52,22 @@ response status =
 
 
 getGuestSession :
-    Request
-    -> ((Session -> Task Error Response) -> Partial msg)
+    ApiPartApi msg
     -> (Request -> (Error -> msg) -> (Session -> Task Error Response) -> Partial msg)
-    -> (Response -> msg)
     -> Partial msg
-getGuestSession request doWithSession withSessionMaybe sendResponse =
-    (case containsParam "forceNew" request of
+getGuestSession api withSessionMaybe =
+    (case containsParam "forceNew" api.request of
         True ->
             fail (BadStatus (response 404)) 
         False ->
-            get (getIdSession request) sessions)
-    |> onError (processGetSessionError request)
+            get (getIdSession api.request) sessions)
+    |> onError (processGetSessionError api.request)
     |> Task.attempt
         (\result ->
             case result of
                 Ok session ->
-                    sendResponse <|
-                        case containsParam "noHeader" request of
+                    api.sendResponse <|
+                        case containsParam "noHeader" api.request of
                             True ->
                                 (okResponse (encodeSession session))
                             False ->
@@ -81,7 +80,7 @@ getGuestSession request doWithSession withSessionMaybe sendResponse =
                         x =
                             Debug.log "error" error
                     in
-                        sendResponse (statusResponse 500)
+                        api.sendResponse (statusResponse 500)
         )
     |> Command
 

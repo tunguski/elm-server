@@ -12,6 +12,7 @@ import Result exposing (Result)
 import Task exposing (Task)
 
 
+import ApiPartApi exposing (..)
 import AwaitingTable exposing (..)
 import BaseModel exposing (..)
 import ExampleDb exposing (..)
@@ -111,21 +112,17 @@ eraseDb _ =
         ++ (List.map createCollection requiredTables)
 
 
--- init : Request -> Partial Msg
-
-
-init : Initializer Msg
+init : Initializer Msg -- Request -> Partial Msg
 init request =
     let
-        doWithSession =
-            withSession request
+        api = ApiPartApi request (withSession request) SendResponse
 
         -- serialize provided object and return it as successful task response with status 200
         restMap =
             P "api"
-                [ sessionApiPart request doWithSession withSessionMaybe SendResponse
-                , tablesApiPart request doWithSession SendResponse
-                , awaitingTablesApiPart request doWithSession SendResponse
+                [ sessionApiPart api withSessionMaybe
+                , tablesApiPart api
+                , awaitingTablesApiPart api
                 , P "init"
                     [ F initDb ]
                 , P "eraseDb"
@@ -140,8 +137,7 @@ init request =
                 Result (statusResponse 404)
 
 
--- update : Request -> Msg -> Partial Msg
-update : Updater Msg
+update : Updater Msg -- Request -> Msg -> Partial Msg
 update request msg =
     case Debug.log "update msg" msg of
         SendResponse response ->

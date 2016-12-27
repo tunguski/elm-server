@@ -3,6 +3,9 @@ module Table exposing (..)
 import String
 import Task exposing (..)
 import Http exposing (Error)
+
+
+import ApiPartApi exposing (..)
 import BaseModel exposing (..)
 import ExampleDb exposing (..)
 import MongoDb exposing (..)
@@ -15,17 +18,15 @@ import TichuModelJson exposing (..)
 
 
 tablesApiPart :
-    Request
-    -> ((Session -> Task Error Response) -> Partial msg)
-    -> (Response -> msg)
+    ApiPartApi msg
     -> Parse (Partial msg)
-tablesApiPart request doWithSession sendResponse =
+tablesApiPart api =
     P "tables"
         [ S
             (\id ->
                 [ F
                     (\() ->
-                        doWithSession
+                        api.doWithSession
                             (\session ->
                                 get id games
                                     |> andThen
@@ -46,11 +47,11 @@ tablesApiPart request doWithSession sendResponse =
             )
         , F
             (\() ->
-                case Debug.log "method" (String.toLower request.method) of
+                case Debug.log "method" (String.toLower api.request.method) of
                     "post" ->
-                        doWithSession
+                        api.doWithSession
                             (\session ->
-                                (get request.body games)
+                                (get api.request.body games)
                                     -- create new table only if table was not found in db
                                     |>
                                         onError
@@ -59,7 +60,7 @@ tablesApiPart request doWithSession sendResponse =
                                                     table =
                                                         initialGame "test"
                                                 in
-                                                    put request.body table games
+                                                    put api.request.body table games
                                                         |> andThenReturn (Task.succeed table)
                                             )
                                     -- if table exists, return error information that name is reserved
@@ -75,12 +76,12 @@ tablesApiPart request doWithSession sendResponse =
                                 (\result ->
                                     case result of
                                         Ok tables ->
-                                            sendResponse
+                                            api.sendResponse
                                                 (okResponse
                                                     (encodeCollection gameEncoder tables)
                                                 )
                                         Err error ->
-                                          (error |> toString >> response 500 >> sendResponse)
+                                          (error |> toString >> response 500 >> api.sendResponse)
                                 )
                             |> Command
 

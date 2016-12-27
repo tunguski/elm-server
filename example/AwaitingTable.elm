@@ -7,6 +7,7 @@ import Time exposing (second)
 import Http exposing (Error)
 
 
+import ApiPartApi exposing (..)
 import BaseModel exposing (..)
 import ExampleDb exposing (..)
 import MongoDb exposing (..)
@@ -20,19 +21,17 @@ import UrlParse exposing (..)
 
 
 awaitingTablesApiPart :
-    Request
-    -> ((Session -> Task Error Response) -> Partial msg)
-    -> (Response -> msg)
+    ApiPartApi msg
     -> Parse (Partial msg)
-awaitingTablesApiPart request doWithSession sendResponse =
+awaitingTablesApiPart api =
     P "awaitingTables"
         [ S
             (\id ->
                 [ F
                     (\() ->
-                        case parseRequestMethod request.method of
+                        case parseRequestMethod api.request.method of
                             Get ->
-                                doWithSession
+                                api.doWithSession
                                     (\session ->
                                         get id awaitingTables
                                             |> andThen
@@ -47,7 +46,7 @@ awaitingTablesApiPart request doWithSession sendResponse =
                                                                                 if name /= session.username then
                                                                                     user
                                                                                 else
-                                                                                    ( name, request.time )
+                                                                                    ( name, api.request.time )
                                                                     )
                                                                     table.users
                                                         } awaitingTables
@@ -65,7 +64,7 @@ awaitingTablesApiPart request doWithSession sendResponse =
                                     )
 
                             Post ->
-                                doWithSession
+                                api.doWithSession
                                     (\session ->
                                         (get id awaitingTables)
                                             -- create new table only if table was not found in db
@@ -75,7 +74,7 @@ awaitingTablesApiPart request doWithSession sendResponse =
                                                         let
                                                             table =
                                                                 AwaitingTable id
-                                                                    [ ( session.username, request.time ) ]
+                                                                    [ ( session.username, api.request.time ) ]
                                                         in
                                                             put id table awaitingTables
                                                                 |> andThenReturn (Task.succeed table)
@@ -107,7 +106,7 @@ awaitingTablesApiPart request doWithSession sendResponse =
                             let
                                 toUpdate =
                                     List.filter
-                                        (.users >> List.any (\( name, time ) -> (time + (5 * second) < request.time)))
+                                        (.users >> List.any (\( name, time ) -> (time + (5 * second) < api.request.time)))
                                         tables.elements
 
                                 updated =
@@ -115,7 +114,7 @@ awaitingTablesApiPart request doWithSession sendResponse =
                                         (\table ->
                                             { table
                                                 | users =
-                                                    List.filter (\( name, time ) -> (time + (5 * second) > request.time)) table.users
+                                                    List.filter (\( name, time ) -> (time + (5 * second) > api.request.time)) table.users
                                             }
                                         )
                                         toUpdate
@@ -140,12 +139,12 @@ awaitingTablesApiPart request doWithSession sendResponse =
                         (\result ->
                             case result of
                                 Ok tables ->
-                                    sendResponse
+                                    api.sendResponse
                                         (okResponse
                                             (encodeCollection awaitingTableEncoder tables)
                                         )
                                 Err error ->
-                                  (error |> toString >> response 500 >> sendResponse)
+                                  (error |> toString >> response 500 >> api.sendResponse)
                         )
                     |> Command
             )
