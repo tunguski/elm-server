@@ -55,6 +55,7 @@ type alias Request =
     { id : String
     , time : Time
     , headers : List ( String, String )
+    , queryParams : List ( String, String )
     , url : String
     , method : String
     , body : String
@@ -158,6 +159,11 @@ getHeader key request =
 setCookie : String -> String -> Response -> Response
 setCookie name value response =
     { response | headers = ( name, value ) :: response.headers }
+
+
+containsParam : String -> Request -> Bool
+containsParam name request =
+    List.any (\(key, value) -> key == name) request.queryParams
 
 
 type alias Model =

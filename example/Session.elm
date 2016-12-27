@@ -54,10 +54,14 @@ sessionApiPart request doWithSession withSessionMaybe sendResponse =
                             (\result ->
                                 case result of
                                     Ok session ->
-                                        sendResponse
-                                            (setCookie "Set-Cookie"
-                                                ("SESSIONID=" ++ session.token ++ "; Path=/;")
-                                                (okResponse (encodeSession session))
+                                        sendResponse <|
+                                            case containsParam "noHeader" request of
+                                                True ->
+                                                    (okResponse (encodeSession session))
+                                                False ->
+                                                    (setCookie "Set-Cookie"
+                                                        ("SESSIONID=" ++ session.token ++ "; Path=/;")
+                                                        (okResponse (encodeSession session))
                                             )
                                     Err error ->
                                         let

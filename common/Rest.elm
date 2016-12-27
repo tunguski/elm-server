@@ -1,4 +1,18 @@
-module Rest exposing (RestResult, Rest, RestConfig, restCollection, config, ignoreError, andThenReturn, get, findAll, post, postCommand, put, delete)
+module Rest exposing (RestResult,
+                      Rest,
+                      RestConfig,
+                      restCollection,
+                      config,
+                      ignoreError,
+                      andThenReturn,
+                      withHeader,
+                      withQueryParams,
+                      get,
+                      findAll,
+                      post,
+                      postCommand,
+                      put,
+                      delete)
 
 import Http exposing (Error)
 import HttpBuilder exposing (..)
@@ -53,6 +67,13 @@ withHeader key value rest =
     case rest of
         Rest config modifiers ->
             Rest config (modifiers ++ [ HttpBuilder.withHeader key value ])
+
+
+withQueryParams : List (String, String) -> Rest item -> Rest item
+withQueryParams params rest =
+    case rest of
+        Rest config modifiers ->
+            Rest config (modifiers ++ [ HttpBuilder.withQueryParams params ])
 
 
 apply : List (RequestBuilder item -> RequestBuilder item) -> RequestBuilder item -> RequestBuilder item 

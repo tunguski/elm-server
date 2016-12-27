@@ -2,6 +2,7 @@ const http = require('http');
 const httpProxy = require('http-proxy');
 const static = require('node-static');
 const watch = require('watch')
+const url = require('url');
 
 
 global.XMLHttpRequest = require("xhr2");
@@ -58,11 +59,14 @@ const server = http.createServer((req, res) => {
     startTime : new Date().getTime() 
   };
 
-  var headers = [];
-  req.headers
+  function objectToMap (obj) {
+    var map = [];
 
-  for(var header in req.headers) {
-    headers.push([ header, req.headers[header] ]);
+    for(var key in obj) {
+      map.push([ key, obj[key] ]);
+    }
+
+    return map;
   }
 
   var body = [];
@@ -81,8 +85,9 @@ const server = http.createServer((req, res) => {
     app.ports.request.send({ 
       id : id, 
       time : new Date().getTime(),
-      url : req.url, 
-      headers : headers,
+      url : req.url.substr(0, req.url.indexOf("?")) || req.url,
+      headers : objectToMap(req.headers),
+      queryParams : objectToMap(url.parse(req.url, true).query),
       method : req.method,
       body : body
     });
