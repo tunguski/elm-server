@@ -185,9 +185,16 @@ getCookies request =
                 Dict.empty
 
 
+x_test_session = "X-Test-Session"
+
+
 getIdSession : Request -> Maybe String
 getIdSession request =
-    Dict.get "SESSIONID" <| getCookies request
+    case getHeader x_test_session request of
+        Just id ->
+            Just (Debug.log x_test_session id)
+        Nothing ->
+            Dict.get "SESSIONID" <| getCookies request
 
 
 fakeResponse : Int -> Http.Response String
@@ -205,7 +212,7 @@ executeIfIdSessionExists request task =
 
 getHeader : String -> Request -> Maybe String
 getHeader key request =
-    List.filter (\( headerKey, value ) -> headerKey == key) request.headers
+    List.filter (\( headerKey, value ) -> headerKey == (String.toLower key)) request.headers
         |> List.head
         |> Maybe.map (\( k, v ) -> v)
 
