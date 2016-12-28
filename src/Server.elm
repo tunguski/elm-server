@@ -1,11 +1,12 @@
 port module Server exposing (..)
 
+import Dict exposing (Dict, empty)
+import Maybe
+import Http exposing (Error(..))
 import Platform exposing (program)
 import String
-import Maybe
 import Task
 import Time exposing (Time)
-import Dict exposing (Dict, empty)
 
 
 type Partial msg
@@ -48,7 +49,6 @@ type RequestMethod
     | Put
     | Patch
     | Delete
-    | MalformedMethod
 
 
 type alias Request =
@@ -57,9 +57,55 @@ type alias Request =
     , headers : List ( String, String )
     , queryParams : List ( String, String )
     , url : String
+    , method : RequestMethod
+    , body : String
+    , idSession : Maybe String
+    , test : Bool
+    }
+
+
+type alias PortRequest =
+    { id : String
+    , time : Time
+    , headers : List ( String, String )
+    , queryParams : List ( String, String )
+    , url : String
     , method : String
     , body : String
     }
+
+
+baseRequest r =
+    Request
+        r.id
+        r.time
+        r.headers
+        r.queryParams
+        r.url
+        Get
+        r.body
+        Nothing
+        False
+
+
+parseRequest : PortRequest -> Maybe Request
+parseRequest r =
+    case parseRequestMethod r.method of
+        Just method ->
+            let
+                request = baseRequest r
+            in
+                Just { request
+                     | method = method
+                     , idSession = getIdSession request
+                     , test = case getHeader "X-Test-Session" request of
+                                Just _ ->
+                                    True
+                                Nothing ->
+                                    False
+                     }
+        Nothing ->
+            Nothing
 
 
 type alias Response =
@@ -92,26 +138,26 @@ response status body =
     Response [] status body
 
 
-parseRequestMethod : String -> RequestMethod
+parseRequestMethod : String -> Maybe RequestMethod
 parseRequestMethod method =
     case String.toLower method of
         "get" ->
-            Get
+            Just Get
 
         "post" ->
-            Post
+            Just Post
 
         "put" ->
-            Put
+            Just Put
 
         "patch" ->
-            Patch
+            Just Patch
 
         "delete" ->
-            Delete
+            Just Delete
 
         _ ->
-            MalformedMethod
+            Nothing
 
 
 getCookies : Request -> Dict String String
@@ -139,14 +185,22 @@ getCookies request =
                 Dict.empty
 
 
-getIdSession : Request -> String
+getIdSession : Request -> Maybe String
 getIdSession request =
-    case Dict.get "SESSIONID" <| getCookies request of
-        Just id ->
-            id
+    Dict.get "SESSIONID" <| getCookies request
 
+
+fakeResponse : Int -> Http.Response String
+fakeResponse status =
+    Http.Response "" { code = status, message = "" } Dict.empty ""
+
+
+executeIfIdSessionExists request task =
+    case request.idSession of
+        Just id ->
+            task id
         Nothing ->
-            "empty"
+            Task.fail (BadStatus (fakeResponse 404))
 
 
 getHeader : String -> Request -> Maybe String
@@ -174,7 +228,7 @@ type alias Model =
 
 
 type ServerMsg msg
-    = IncomingRequest Request
+    = IncomingRequest PortRequest
     | InternalServerMsg String msg
 
 
@@ -195,14 +249,19 @@ update :
     -> ( Model, Cmd (ServerMsg m) )
 update initializer updater msg model =
     case msg of
-        IncomingRequest request ->
-            case initializer request of
-                Result response ->
-                    model ! [ sendResponse request response ]
+        IncomingRequest r ->
+            case parseRequest r of
+                Just request ->
+                    case initializer request of
+                        Result response ->
+                            model ! [ sendResponse request response ]
 
-                Command cmd ->
-                    Dict.insert request.id request model
-                        ! [ Cmd.map (InternalServerMsg request.id) cmd ]
+                        Command cmd ->
+                            Dict.insert request.id request model
+                                ! [ Cmd.map (InternalServerMsg request.id) cmd ]
+
+                Nothing ->
+                    model ! [ sendResponse (baseRequest r) (Response [] 400 "") ]
 
         InternalServerMsg idRequest internalMessage ->
             case Dict.get idRequest model of
@@ -219,7 +278,7 @@ update initializer updater msg model =
                     Debug.crash "Illegal state"
 
 
-port request : (Request -> msg) -> Sub msg
+port request : (PortRequest -> msg) -> Sub msg
 
 
 -- SUBSCRIPTIONS

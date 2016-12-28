@@ -39,13 +39,13 @@ type Msg
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg
 withSession request action =
-    get (getIdSession request) sessions
+    executeIfIdSessionExists request (\id -> get id sessions)
     |> processTask action
 
 
 withSessionMaybe : Request -> (Error -> Msg) -> (Session -> Task Error Response) -> Partial Msg
 withSessionMaybe request errorProcessor action =
-    get (getIdSession request) sessions
+    executeIfIdSessionExists request (\id -> get id sessions)
     |> processTaskWithError errorProcessor action
 
 

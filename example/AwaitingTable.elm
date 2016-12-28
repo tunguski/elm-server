@@ -29,7 +29,7 @@ awaitingTablesApiPart api =
             (\id ->
                 [ F
                     (\() ->
-                        case parseRequestMethod api.request.method of
+                        case api.request.method of
                             Get ->
                                 api.doWithSession
                                     (\session ->

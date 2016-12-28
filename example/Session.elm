@@ -46,11 +46,6 @@ sessionApiPart api withSessionMaybe =
         ]
 
 
-response : Int -> Http.Response String
-response status =
-    Http.Response "" { code = status, message = "" } Dict.empty ""
-
-
 getGuestSession :
     ApiPartApi msg
     -> (Request -> (Error -> msg) -> (Session -> Task Error Response) -> Partial msg)
@@ -58,9 +53,10 @@ getGuestSession :
 getGuestSession api withSessionMaybe =
     (case containsParam "forceNew" api.request of
         True ->
-            fail (BadStatus (response 404)) 
+            fail (BadStatus (fakeResponse 404)) 
         False ->
-            get (getIdSession api.request) sessions)
+            executeIfIdSessionExists api.request (\id -> get id sessions)
+    )
     |> onError (processGetSessionError api.request)
     |> Task.attempt
         (\result ->

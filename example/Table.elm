@@ -47,8 +47,8 @@ tablesApiPart api =
             )
         , F
             (\() ->
-                case Debug.log "method" (String.toLower api.request.method) of
-                    "post" ->
+                case api.request.method of
+                    Post ->
                         api.doWithSession
                             (\session ->
                                 (get api.request.body games)
@@ -70,7 +70,7 @@ tablesApiPart api =
                                             (encode gameEncoder >> okResponse >> Task.succeed)
                             )
 
-                    "get" ->
+                    Get ->
                         listDocuments games
                             |> Task.attempt
                                 (\result ->
