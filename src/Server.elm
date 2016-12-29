@@ -138,6 +138,14 @@ response status body =
     Response [] status body
 
 
+logErrorAndReturn error =
+    case Debug.log "error" error of
+        BadStatus r ->
+            statusResponse r.status.code |> Task.succeed
+        _ ->
+            statusResponse 500 |> Task.succeed
+
+
 parseRequestMethod : String -> Maybe RequestMethod
 parseRequestMethod method =
     case String.toLower method of
