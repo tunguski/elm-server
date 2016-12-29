@@ -136,7 +136,8 @@ postCommand command rest =
 put : String -> item -> Rest item -> Task Error String
 put itemId item rest =
     baseQuery rest (\config -> 
-        withMethod "put"
+        subResource itemId
+        >> withMethod "put"
         >> withJsonBody (config.encoder item)
         >> HttpBuilder.withHeader "Content-Type" "application/json"
         >> withExpect Http.expectString)

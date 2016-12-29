@@ -34,33 +34,33 @@ awaitingTablesApiPart api =
                                 api.doWithSession
                                     (\session ->
                                         get id awaitingTables
-                                            |> andThen
-                                                (\table ->
-                                                    put id 
-                                                        { table
-                                                            | users =
-                                                                List.map
-                                                                    (\user ->
-                                                                        case user of
-                                                                            ( name, time ) ->
-                                                                                if name /= session.username then
-                                                                                    user
-                                                                                else
-                                                                                    ( name, api.request.time )
-                                                                    )
-                                                                    table.users
-                                                        } awaitingTables
-                                                        |> andThenReturn
-                                                            (table |> (encode awaitingTableEncoder >> okResponse >> Task.succeed))
-                                                )
-                                            |> onError
-                                                (\error ->
-                                                    let
-                                                        x =
-                                                            Debug.log "error" error
-                                                    in
-                                                        statusResponse 404 |> Task.succeed
-                                                )
+                                        |> andThen
+                                            (\table ->
+                                                put id 
+                                                    { table
+                                                        | users =
+                                                            List.map
+                                                                (\user ->
+                                                                    case user of
+                                                                        ( name, time ) ->
+                                                                            if name /= session.username then
+                                                                                user
+                                                                            else
+                                                                                ( name, api.request.time )
+                                                                )
+                                                                table.users
+                                                    } awaitingTables
+                                                    |> andThenReturn
+                                                        (table |> (encode awaitingTableEncoder >> okResponse >> Task.succeed))
+                                            )
+                                        |> onError
+                                            (\error ->
+                                                let
+                                                    x =
+                                                        Debug.log "error" error
+                                                in
+                                                    statusResponse 404 |> Task.succeed
+                                            )
                                     )
 
                             Post ->
