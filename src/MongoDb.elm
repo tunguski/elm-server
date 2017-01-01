@@ -66,14 +66,23 @@ getString itemId rest =
         |> toTask
 
 
+{-| List all documents in collection. **It ignores items that cannot
+  be parsed.**
+-}
 listDocuments : Rest item -> Task Error (Collection item)
 listDocuments rest =
-    let
-        conf = config rest
-    in
-        HttpBuilder.get (conf.baseUrl ++ conf.collectionName)
-        |> withExpect (Http.expectJson (collectionDecoder conf.decoder))
-        |> toTask
+    case config rest of
+        conf ->
+            HttpBuilder.get (conf.baseUrl ++ conf.collectionName)
+            |> withExpect (Http.expectJson (collectionDecoder 
+                (oneOf
+                    [ conf.decoder |> map Just
+                    , succeed Nothing
+                    ]
+                )
+            ))
+            |> toTask
+            |> Task.map (\coll -> { coll | elements = List.filterMap identity coll.elements })
 
 
 type alias MongoDb =
