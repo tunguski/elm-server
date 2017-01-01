@@ -255,9 +255,10 @@ awaitingTableDecoder =
         (field "name" string)
         (field "users" <| 
             list 
-                (map2 AwaitingTableUser
+                (map3 AwaitingTableUser
                     (field "name" string)
-                    (field "lastCheck" float))
+                    (field "lastCheck" float)
+                    (field "pressedStart" bool))
         )
 
 
@@ -271,6 +272,7 @@ awaitingTableEncoder table =
                     JE.object
                         [ ("name", JE.string user.name)
                         , ("lastCheck", JE.float user.lastCheck)
+                        , ("pressedStart", JE.bool user.pressedStart)
                         ]
                     ) table.users
                 )

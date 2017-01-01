@@ -63,7 +63,17 @@ startAwaitingTable api id =
         (\session ->
             get id awaitingTables
             |> andThen (\table ->
-                statusResponse 500 |> Task.succeed
+                -- is player sitting at the table?
+                case List.any (.name >> (==) session.username) table.users of
+                    True ->
+                        -- pressedStart & sae
+                        put id { table 
+                            | users = List.map (\user -> if user.name == session.username then { user | pressedStart = True } else user) table.users
+                            } awaitingTables
+                        |> andThenReturn (statusResponse 200 |> Task.succeed)
+                    False ->
+                        -- 404?
+                        statusResponse 404 |> Task.succeed
             )
             |> onError logErrorAndReturn 
         )
@@ -87,13 +97,15 @@ joinAwaitingTable api id =
                     True ->
                         statusResponse 204 |> Task.succeed
                     False ->
-                        put id { table | users = (AwaitingTableUser session.username api.request.time :: table.users) } awaitingTables
+                        put id { table | users = (AwaitingTableUser session.username api.request.time False :: table.users) } awaitingTables
                         |> andThenReturn (statusResponse 201 |> Task.succeed)
             )
             |> onError logErrorAndReturn 
         )
 
 
+{-| Return awaiting table with id.
+-}
 getAwaitingTable api id =
     api.doWithSession
         (\session ->
@@ -127,7 +139,7 @@ postAwaitingTable api id =
                             let
                                 table =
                                     AwaitingTable id
-                                        [ AwaitingTableUser session.username api.request.time ]
+                                        [ AwaitingTableUser session.username api.request.time False ]
                             in
                                 put id table awaitingTables
                                     |> andThenReturn (Task.succeed table)

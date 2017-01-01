@@ -251,6 +251,7 @@ type alias Game =
 type alias AwaitingTableUser =
     { name : String
     , lastCheck : Time
+    , pressedStart : Bool
     }
 
 
