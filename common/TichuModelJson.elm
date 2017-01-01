@@ -253,7 +253,12 @@ awaitingTableDecoder : Decoder AwaitingTable
 awaitingTableDecoder =
     Json.map2 AwaitingTable
         (field "name" string)
-        (field "users" <| list (map2 (,) string float))
+        (field "users" <| 
+            list 
+                (map2 AwaitingTableUser
+                    (field "name" string)
+                    (field "lastCheck" float))
+        )
 
 
 awaitingTableEncoder : AwaitingTable -> Value
@@ -262,8 +267,12 @@ awaitingTableEncoder table =
         [ ( "name", JE.string table.name )
         , ( "users"
           , JE.list
-                (List.map (\user -> JE.list [ JE.string <| Tuple.first user, JE.float <| Tuple.second user ])
-                    table.users
+                (List.map (\user -> 
+                    JE.object
+                        [ ("name", JE.string user.name)
+                        , ("lastCheck", JE.float user.lastCheck)
+                        ]
+                    ) table.users
                 )
           )
         ]
@@ -271,3 +280,5 @@ awaitingTableEncoder table =
 
 encodeAwaitingTable awaitingTable =
     JE.encode 0 <| awaitingTableEncoder awaitingTable
+
+

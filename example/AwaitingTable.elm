@@ -78,7 +78,20 @@ startAwaitingTable api id =
 
 -}
 joinAwaitingTable api id =
-    Result (okResponse ("[TODO] Joined: " ++ id))
+    api.doWithSession
+        (\session ->
+            get id awaitingTables
+            |> andThen (\table ->
+                -- is player sitting at the table?
+                case List.any (.name >> (==) session.username) table.users of
+                    True ->
+                        statusResponse 204 |> Task.succeed
+                    False ->
+                        put id { table | users = (AwaitingTableUser session.username api.request.time :: table.users) } awaitingTables
+                        |> andThenReturn (statusResponse 201 |> Task.succeed)
+            )
+            |> onError logErrorAndReturn 
+        )
 
 
 getAwaitingTable api id =
@@ -90,12 +103,10 @@ getAwaitingTable api id =
                     put id 
                         { table
                         | users = List.map (\user ->
-                                    case user of
-                                        ( name, time ) ->
-                                            if name /= session.username then
-                                                user
-                                            else
-                                                ( name, api.request.time )
+                                        if user.name /= session.username then
+                                            user
+                                        else
+                                            { user | lastCheck = api.request.time }
                                     )
                                     table.users
                         } awaitingTables
@@ -116,7 +127,7 @@ postAwaitingTable api id =
                             let
                                 table =
                                     AwaitingTable id
-                                        [ ( session.username, api.request.time ) ]
+                                        [ AwaitingTableUser session.username api.request.time ]
                             in
                                 put id table awaitingTables
                                     |> andThenReturn (Task.succeed table)
@@ -129,6 +140,10 @@ postAwaitingTable api id =
         )
 
 
+userCheckTooOld api =
+    .lastCheck >> (>) (api.request.time - 5 * second)
+
+
 listAwaitingTables api =
     listDocuments awaitingTables
         |> andThen
@@ -136,7 +151,7 @@ listAwaitingTables api =
                 let
                     toUpdate =
                         List.filter
-                            (.users >> List.any (\( name, time ) -> (time + (5 * second) < api.request.time)))
+                            (.users >> List.any (userCheckTooOld api))
                             tables.elements
 
                     updated =
@@ -144,12 +159,13 @@ listAwaitingTables api =
                             (\table ->
                                 { table
                                     | users =
-                                        List.filter (\( name, time ) -> (time + (5 * second) > api.request.time)) table.users
+                                        List.filter (userCheckTooOld api >> not) table.users
                                 }
                             )
                             toUpdate
 
                     toRemove =
+                        Debug.log "toRemove"
                         (List.filter (.users >> List.isEmpty) tables.elements)
                             ++ (List.filter (.users >> List.isEmpty) updated)
                 in
@@ -177,3 +193,5 @@ listAwaitingTables api =
                       (error |> toString >> response 500 >> api.sendResponse)
             )
         |> Command
+
+

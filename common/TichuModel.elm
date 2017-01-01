@@ -248,9 +248,15 @@ type alias Game =
     }
 
 
+type alias AwaitingTableUser =
+    { name : String
+    , lastCheck : Time
+    }
+
+
 type alias AwaitingTable =
     { name : String
-    , users : List ( String, Time )
+    , users : List AwaitingTableUser
     }
 
 
@@ -288,3 +294,5 @@ initPlayer cards offset =
     , tichu = False
     , grandTichu = False
     }
+
+
