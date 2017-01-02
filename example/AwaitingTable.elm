@@ -1,6 +1,7 @@
 module AwaitingTable exposing (..)
 
 
+import Array
 import String
 import Task exposing (..)
 import Time exposing (second)
@@ -67,16 +68,47 @@ startAwaitingTable api id =
                 case List.any (.name >> (==) session.username) table.users of
                     True ->
                         -- pressedStart & sae
-                        put id { table 
-                            | users = List.map (\user -> if user.name == session.username then { user | pressedStart = True } else user) table.users
-                            } awaitingTables
-                        |> andThenReturn (statusResponse 200 |> Task.succeed)
+                        let
+                            updatedTable =
+                                { table
+                                | users = List.map (\user ->
+                                        if user.name == session.username
+                                        then { user | pressedStart = True }
+                                        else user
+                                    ) table.users
+                                }
+                        in
+                            put id updatedTable awaitingTables
+                            |> andThen (createGame updatedTable)
+                            |> andThenReturn (statusResponse 200 |> Task.succeed)
                     False ->
                         -- 404?
                         statusResponse 404 |> Task.succeed
             )
             |> onError logErrorAndReturn 
         )
+
+
+createGame : AwaitingTable -> String -> Task Error String
+createGame table r =
+    -- if all players clicked start, create table based on awaiting table
+    if List.all .pressedStart table.users
+    then
+        case List.map (\user -> get user.name users) table.users of
+            a :: b :: c :: d :: [] ->
+                Task.map4 (,,,) a b c d
+                |> Task.andThen (\(u1, u2, u3, u4) ->
+                    post table.name (Game
+                        table.name
+                        (Array.fromList [(u1, 0), (u2, 0), (u3, 0), (u4, 0)])
+                        (Round Array.empty [] 0)
+                        [] [] []) games
+                    |> andThenReturn (succeed r)
+                )
+            _ ->
+                Debug.crash "Illegal state"
+    else
+        succeed r
 
 
 {-| Join table awaiting for all players.
