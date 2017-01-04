@@ -56,7 +56,8 @@ awaitingTablesApiPart api =
 1. Load table
 2. Check is actual player sitting at it
 3. Mark player as wanting to play
-4. Save change to db
+4. If more players need to confirm, save change to db
+5. If this is last confirmation, remove AwaitingTable and create Game
 
 -}
 startAwaitingTable api id =
@@ -67,7 +68,7 @@ startAwaitingTable api id =
                 -- is player sitting at the table?
                 case List.any (.name >> (==) session.username) table.users of
                     True ->
-                        -- pressedStart & sae
+                        -- pressedStart & save
                         let
                             updatedTable =
                                 { table
@@ -89,6 +90,8 @@ startAwaitingTable api id =
         )
 
 
+{-| Create Game if all players pressed start.
+-}
 createGame : AwaitingTable -> String -> Task Error String
 createGame table r =
     -- if all players clicked start, create table based on awaiting table
@@ -96,15 +99,16 @@ createGame table r =
     then
         case List.map (\user -> get user.name users) table.users of
             a :: b :: c :: d :: [] ->
-                Task.map4 (,,,) a b c d
-                |> Task.andThen (\(u1, u2, u3, u4) ->
-                    post table.name (Game
-                        table.name
-                        (Array.fromList [(u1, 0), (u2, 0), (u3, 0), (u4, 0)])
-                        (Round Array.empty [] 0)
-                        [] [] []) games
-                    |> andThenReturn (succeed r)
-                )
+                post table.name (Game
+                    table.name
+                    (Array.fromList <|
+                        List.map (\user ->
+                            GameUser user.name user.lastCheck
+                        ) table.users
+                    )
+                    (Round Array.empty [] 0)
+                    [] [] []) games
+                |> andThenReturn (succeed r)
             _ ->
                 Debug.crash "Illegal state"
     else
@@ -172,6 +176,7 @@ postAwaitingTable api id =
                                 table =
                                     AwaitingTable id
                                         [ AwaitingTableUser session.username api.request.time False ]
+                                        api.request.test
                             in
                                 put id table awaitingTables
                                     |> andThenReturn (Task.succeed table)
@@ -191,12 +196,14 @@ userCheckTooOld api =
 listAwaitingTables api =
     listDocuments awaitingTables
         |> andThen
-            (\tables ->
+            (.elements >>
+             List.filter (\table -> table.test == api.request.test) >>
+             (\tables ->
                 let
                     toUpdate =
                         List.filter
                             (.users >> List.any (userCheckTooOld api))
-                            tables.elements
+                            tables
 
                     updated =
                         List.map
@@ -210,7 +217,7 @@ listAwaitingTables api =
 
                     toRemove =
                         Debug.log "toRemove"
-                        (List.filter (.users >> List.isEmpty) tables.elements)
+                        (List.filter (.users >> List.isEmpty) tables)
                             ++ (List.filter (.users >> List.isEmpty) updated)
                 in
                     Task.sequence
@@ -224,7 +231,7 @@ listAwaitingTables api =
                             (\r ->
                                 listDocuments awaitingTables
                             )
-            )
+            ))
         |> Task.attempt
             (\result ->
                 case result of

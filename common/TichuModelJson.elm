@@ -15,7 +15,7 @@ gameDecoder : Decoder Game
 gameDecoder =
     Json.map6 Game
         (field "name" string)
-        (field "users" <| array (map2 (,) userDecoder int))
+        (field "users" <| array gameUser)
         (field "round" round)
         (field "history" <| list round)
         (field "messages" <| list message)
@@ -28,6 +28,13 @@ round =
         (field "players" <| array player)
         (field "table" <| list (list card))
         (field "actualPlayer" int)
+
+
+gameUser : Decoder GameUser
+gameUser =
+    Json.map2 GameUser
+        (field "name" string)
+        (field "lastCheck" float)
 
 
 card : Decoder Card
@@ -163,10 +170,7 @@ gameEncoder game =
         [ ( "name", JE.string game.name )
         , ( "users"
           , JE.array
-                (Array.map
-                    (\( user, int ) ->
-                        JE.list [ userEncoder user, JE.int int ]
-                    )
+                (Array.map gameUserEncoder
                     game.users
                 )
           )
@@ -174,6 +178,14 @@ gameEncoder game =
         , ( "history", JE.list (List.map roundEncoder game.history) )
         , ( "messages", JE.list (List.map messageEncoder game.messages) )
         , ( "log", JE.list [] )
+        ]
+
+
+gameUserEncoder : GameUser -> Value
+gameUserEncoder gameUser =
+    JE.object
+        [ ( "name", JE.string gameUser.name )
+        , ( "lastCheck", JE.float gameUser.lastCheck )
         ]
 
 
@@ -251,7 +263,7 @@ encodeSuit item =
 
 awaitingTableDecoder : Decoder AwaitingTable
 awaitingTableDecoder =
-    Json.map2 AwaitingTable
+    Json.map3 AwaitingTable
         (field "name" string)
         (field "users" <| 
             list 
@@ -260,6 +272,7 @@ awaitingTableDecoder =
                     (field "lastCheck" float)
                     (field "pressedStart" bool))
         )
+        (field "test" bool)
 
 
 awaitingTableEncoder : AwaitingTable -> Value
@@ -277,6 +290,7 @@ awaitingTableEncoder table =
                     ) table.users
                 )
           )
+        , ( "test", JE.bool table.test )
         ]
 
 

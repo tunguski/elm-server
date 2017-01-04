@@ -238,9 +238,15 @@ type alias Message =
     }
 
 
+type alias GameUser =
+    { name : String
+    , lastCheck : Time
+    }
+
+
 type alias Game =
     { name : String
-    , users : Array ( User, Int )
+    , users : Array GameUser
     , round : Round
     , history : List Round
     , messages : List Message
@@ -258,6 +264,7 @@ type alias AwaitingTableUser =
 type alias AwaitingTable =
     { name : String
     , users : List AwaitingTableUser
+    , test : Bool
     }
 
 
