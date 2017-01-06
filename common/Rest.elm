@@ -118,7 +118,8 @@ findAll rest =
 post : String -> item -> Rest item -> Task Error String
 post itemId item rest =
     baseQuery rest (\config -> 
-        withMethod "post"
+        subResource itemId
+        >> withMethod "post"
         >> withJsonBody (config.encoder item)
         >> HttpBuilder.withHeader "Content-Type" "application/json"
         >> withExpect Http.expectString)
