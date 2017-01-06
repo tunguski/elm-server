@@ -14,6 +14,7 @@ import Task exposing (Task)
 
 import ApiPartApi exposing (..)
 import AwaitingTable exposing (..)
+import Game exposing (..)
 import BaseModel exposing (..)
 import ExampleDb exposing (..)
 import MongoDb exposing (..)
@@ -123,6 +124,7 @@ init request =
                 [ sessionApiPart api withSessionMaybe
                 , tablesApiPart api
                 , awaitingTablesApiPart api
+                , gamesApiPart api
                 , P "init"
                     [ F initDb ]
                 , P "eraseDb"

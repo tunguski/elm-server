@@ -99,7 +99,7 @@ createGame table r =
     then
         case List.map (\user -> get user.name users) table.users of
             a :: b :: c :: d :: [] ->
-                post table.name (Game
+                put table.name (Game
                     table.name
                     (Array.fromList <|
                         List.map (\user ->
