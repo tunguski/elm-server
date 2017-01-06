@@ -7,6 +7,8 @@ type Parse fn
     = S (String -> List (Parse fn))
     | I (Int -> List (Parse fn))
     | P String (List (Parse fn))
+    | PF String (() -> fn)
+    | PT String fn
     | T fn
     | F (() -> fn)
 
@@ -63,6 +65,12 @@ internal parser input =
                 chooseFirst list (String.dropLeft (String.length path + 1) input)
             else
                 Err "no match found"
+
+        PF path function ->
+            internal (P path [ F function ]) input
+
+        PT path function ->
+            internal (P path [ T function ]) input
 
         T result ->
             case input of
