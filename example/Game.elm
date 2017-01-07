@@ -36,15 +36,68 @@ gamesApiPart api =
                         _ ->
                             statusResponse 405 |> Result
                 )
+            , PF "seeAllCards" (\() -> seeAllCards api id)
             , PF "declareTichu" (\() -> declareTichu api id)
             , PF "declareGrandTichu" (\() -> declareGrandTichu api id)
             , PF "pass" (\() -> pass api id)
             , PF "hand" (\() -> hand api id)
---            , PF "" (\() ->  api id)
---            , PF "" (\() ->  api id)
             ]
           )
         ]
+
+
+getActualPlayer : Round -> Player
+getActualPlayer round =
+    case Array.get (round.actualPlayer % 4) round.players of
+        Just player -> player
+        Nothing -> Debug.crash "Malformed state"
+
+
+openDemand round =
+    case round.demand of
+        Just r -> not round.demandCompleted
+        Nothing -> False
+
+
+openDemandMatch round =
+    case round.demand of
+        Just r ->
+            List.any (\card ->
+                case card of
+                    NormalCard suit rank ->
+                        (not round.demandCompleted) && (rank == r)
+                    _ ->
+                        False
+            ) (getActualPlayer round).hand
+        Nothing ->
+            False
+
+
+getPlayer round name =
+    Array.filter (.name >> (==) name) round.players
+    |> Array.get 0
+    |> Maybe.map identity
+    |> Maybe.withDefault (Debug.crash "Malformed state")
+
+
+modifyPlayer round name function =
+    { round | players =
+        Array.map (\player ->
+            case player.name == name of
+                True ->
+                    function player
+                False ->
+                    player
+        ) round.players
+    }
+
+
+doWithTable api id function =
+    api.doWithSession (\session ->
+        get id games |> andThen (\table ->
+            function session table table.round
+                (getPlayer table.round session.username))
+    )
 
 
 {-| Pass player's move
@@ -55,9 +108,22 @@ gamesApiPart api =
 4. Save state
 
 -}
+pass : ApiPartApi msg -> String -> Partial msg
 pass api id =
-    doWithTable api id (\session table ->
-        statusResponse 500 |> Task.succeed
+    doWithTable api id (\session table round player ->
+        let
+            isActualPlayer =
+                (getActualPlayer round).name == session.username
+            hasDemandedCard = openDemandMatch round
+        in
+            case isActualPlayer && not hasDemandedCard of
+                True ->
+                    -- switch to next player and return ok
+                    put table.name { table |
+                        round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
+                    |> andThenReturn (statusResponse 200 |> Task.succeed)
+                False ->
+                    statusResponse 400 |> Task.succeed
     )
 
 
@@ -70,9 +136,50 @@ pass api id =
 5. Save state
 
 -}
+hand : ApiPartApi msg -> String -> Partial msg
 hand api id =
-    doWithTable api id (\session table ->
-        statusResponse 500 |> Task.succeed
+    doWithTable api id (\session table round player ->
+        let
+            isActualPlayer =
+                (getActualPlayer round).name == session.username
+            hasDemandedCard = openDemandMatch round
+            isOpenDemand = openDemand round
+            trick = parseTrick round session.username
+            isDemandedCardInTrick = cardInTrick round.demand player.selection
+            isBomb = bomb trick
+            bombEnoughPower = True
+        in
+            if isActualPlayer then
+                if isOpenDemand then
+                    if hasDemandedCard then
+                        if isDemandedCardInTrick then
+                            statusResponse 400 |> Task.succeed
+                        else
+                            statusResponse 400 |> Task.succeed
+                    else
+                        statusResponse 400 |> Task.succeed
+                else
+                    -- play, switch to next player and return ok
+                    put table.name { table |
+                        round = { round
+                            | actualPlayer = round.actualPlayer + 1 % 4
+                        }
+                    } games
+                    |> andThenReturn (statusResponse 200 |> Task.succeed)
+            else
+                if isBomb then
+                    if bombEnoughPower then
+                        -- play, switch to next player and return ok
+                        put table.name { table |
+                            round = { round
+                                | actualPlayer = round.actualPlayer + 1 % 4
+                            }
+                        } games
+                        |> andThenReturn (statusResponse 200 |> Task.succeed)
+                    else
+                        statusResponse 400 |> Task.succeed
+                else
+                    statusResponse 400 |> Task.succeed
     )
 
 
@@ -82,10 +189,11 @@ hand api id =
 2. Modify state
 
 -}
+declareTichu : ApiPartApi msg -> String -> Partial msg
 declareTichu api id =
-    doWithTable api id (\session table ->
-        statusResponse 500 |> Task.succeed
-    )
+    updateAndReturnIf api id
+        (.cardsOnHand >> (==) 14)
+        (\player -> { player | tichu = True })
 
 
 {-| Declare grand tichu
@@ -94,27 +202,48 @@ declareTichu api id =
 2. Modify state
 
 -}
+declareGrandTichu : ApiPartApi msg -> String -> Partial msg
 declareGrandTichu api id =
-    doWithTable api id (\session table ->
-        statusResponse 500 |> Task.succeed
-    )
+    updateAndReturnIf api id
+        (.sawAllCards >> not)
+        (\player -> { player | grandTichu = True })
 
 
-doWithTable api id function =
-    api.doWithSession (\session ->
-        get id games |> andThen (function session)
+{-| If player does not want to play grand tichu, he may see all cards
+
+1. Check if player saw all cards
+2. Modify state
+
+-}
+seeAllCards : ApiPartApi msg -> String -> Partial msg
+seeAllCards api id =
+    updateAndReturnIf api id
+        (.sawAllCards >> not)
+        (\player -> { player | sawAllCards = True })
+
+
+updateAndReturnIf api id condition update =
+    doWithTable api id (\session table round player ->
+        if condition player then
+            put table.name { table | round =
+                modifyPlayer round session.username update
+            } games
+            |> andThenReturn (statusResponse 200 |> Task.succeed)
+        else
+            statusResponse 400 |> Task.succeed
     )
 
 
 {-| Return awaiting table with id.
 -}
+getGame : ApiPartApi msg -> String -> Partial msg
 getGame api id =
     api.doWithSession
         (\session ->
             get id games
             |> andThen
                 (\table ->
-                    put id 
+                    put id
                         { table
                         | users = Array.map (\user ->
                                         if user.name /= session.username then

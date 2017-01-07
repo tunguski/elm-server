@@ -204,24 +204,59 @@ allowedCombination table combination =
     False
 
 
+parseTrick : Round -> String -> Maybe Combination
+parseTrick round name =
+    Nothing
+
+
+cardInTrick : Maybe Rank -> Cards -> Bool
+cardInTrick rank selection =
+    case rank of
+        Just r ->
+            List.any (\card ->
+                case card of
+                    NormalCard suit cardRank ->
+                        cardRank == r
+                    _ ->
+                        False
+            ) selection
+        Nothing ->
+            True
+
+
+bomb : Maybe Combination -> Bool
+bomb combination =
+    case combination of
+        Just (StraightFlush r i) ->
+            True
+        Just (Four r) ->
+            True
+        _ ->
+            False
+
+
+
 type alias Player =
     { hand : List Card
+    , cardsOnHand : Int
     , collected : List Card
     , selection : List Card
     , name : String
     , score : Int
     , tichu : Bool
+    , sawAllCards : Bool
     , grandTichu : Bool
     }
 
 
 type alias Round =
     -- players in order, first has to play
-    { players :
-        Array Player
-        -- hands on table
+    { players : Array Player
+    -- hands on table
     , table : List Cards
     , actualPlayer : Int
+    , demand : Maybe Rank
+    , demandCompleted : Bool
     }
 
 
@@ -289,17 +324,21 @@ initRound cards =
     { players = initialize 4 (\i -> initPlayer cards i)
     , table = []
     , actualPlayer = 0
+    , demand = Nothing
+    , demandCompleted = False
     }
 
 
 initPlayer : List Card -> Int -> Player
 initPlayer cards offset =
     { hand = sortWith cardOrder <| take 13 <| drop (offset * 13) cards
+    , cardsOnHand = 14
     , collected = []
     , selection = []
     , name = "test!"
     , score = 0
     , tichu = False
+    , sawAllCards = False
     , grandTichu = False
     }
 

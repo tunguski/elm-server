@@ -106,7 +106,7 @@ createGame table r =
                             GameUser user.name user.lastCheck
                         ) table.users
                     )
-                    (Round Array.empty [] 0)
+                    (Round Array.empty [] 0 Nothing False)
                     [] [] []) games
                 |> andThenReturn (succeed r)
             _ ->

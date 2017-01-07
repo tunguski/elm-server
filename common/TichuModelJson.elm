@@ -24,10 +24,12 @@ gameDecoder =
 
 round : Decoder Round
 round =
-    Json.map3 Round
+    Json.map5 Round
         (field "players" <| array player)
         (field "table" <| list (list card))
         (field "actualPlayer" int)
+        (field "demand" (maybe rank))
+        (field "demandCompleted" bool)
 
 
 gameUser : Decoder GameUser
@@ -119,14 +121,19 @@ rank =
 
 player : Decoder Player
 player =
-    map7 Player
+    map8 Player
         (field "hand" <| list card)
+        (field "cardsOnHand" <| int)
         (field "collected" <| list card)
         (field "selection" <| list card)
         (field "name" string)
         (field "score" int)
         (field "tichu" bool)
-        (field "grandTichu" bool)
+        (field "sawAllCards" bool)
+    |> andThen (\p ->
+        map p
+            (field "grandTichu" bool)
+    )
 
 
 message : Decoder Message
@@ -202,15 +209,7 @@ cardEncoder card =
             JE.object
                 [ ( "type", JE.string "NormalCard" )
                 , ( "suit", JE.string <| toString suit )
-                , ( "rank"
-                  , JE.string <|
-                        case rank of
-                            R value ->
-                                toString value
-
-                            _ ->
-                                toString rank
-                  )
+                , ( "rank", rankEncoder rank )
                 ]
 
         _ ->
@@ -218,15 +217,27 @@ cardEncoder card =
                 [ ( "type", JE.string (toString card) ) ]
 
 
+rankEncoder : Rank -> Value
+rankEncoder rank =
+    JE.string <|
+        case rank of
+            R value ->
+                toString value
+            _ ->
+                toString rank
+
+
 playerEncoder : Player -> Value
 playerEncoder player =
     JE.object
         [ ( "hand", listToValue cardEncoder player.hand )
+        , ( "cardsOnHand", JE.int player.score )
         , ( "collected", listToValue cardEncoder player.collected )
         , ( "selection", listToValue cardEncoder player.selection )
         , ( "name", JE.string player.name )
         , ( "score", JE.int player.score )
         , ( "tichu", JE.bool player.tichu )
+        , ( "sawAllCards", JE.bool player.tichu )
         , ( "grandTichu", JE.bool player.grandTichu )
         ]
 
@@ -237,6 +248,14 @@ roundEncoder round =
         [ ( "players", arrayToValue playerEncoder round.players )
         , ( "table", listToValue (List.map cardEncoder >> JE.list) round.table )
         , ( "actualPlayer", JE.int round.actualPlayer )
+        , ( "demand",
+            case round.demand of
+                Just rank ->
+                    rankEncoder rank
+                Nothing ->
+                    JE.null
+          )
+        , ( "demandCompleted", JE.bool round.demandCompleted )
         ]
 
 
