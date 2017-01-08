@@ -52,7 +52,7 @@ tablesApiPart api =
                             |> onError (\error ->
                                 let
                                     table =
-                                        initialGame "test"
+                                        initGame "test" 0 []
                                 in
                                     put api.request.body table games
                                     |> andThenReturn (Task.succeed table)

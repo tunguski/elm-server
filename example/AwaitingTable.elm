@@ -99,16 +99,9 @@ createGame table r =
     then
         case List.map (\user -> get user.name users) table.users of
             a :: b :: c :: d :: [] ->
-                put table.name (Game
-                    table.name
-                    table.seed
-                    (Array.fromList <|
-                        List.map (\user ->
-                            GameUser user.name user.lastCheck
-                        ) table.users
-                    )
-                    (Round Array.empty [] 0 Nothing False table.seed)
-                    [] [] []) games
+                put table.name 
+                    (initGame table.name table.seed table.users)
+                    games
                 |> andThenReturn (succeed r)
             _ ->
                 Debug.crash "Illegal state"

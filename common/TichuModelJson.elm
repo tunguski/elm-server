@@ -252,7 +252,7 @@ playerEncoder : Player -> Value
 playerEncoder player =
     JE.object
         [ ( "hand", listToValue cardEncoder player.hand )
-        , ( "cardsOnHand", JE.int player.score )
+        , ( "cardsOnHand", JE.int player.cardsOnHand )
         , ( "collected", listToValue cardEncoder player.collected )
         , ( "selection", listToValue cardEncoder player.selection )
         , ( "name", JE.string player.name )

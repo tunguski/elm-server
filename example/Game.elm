@@ -287,8 +287,20 @@ getGame api id =
                                     )
                                     table.users
                         } games
-                    |> andThenReturn
-                        (table |> (encode gameEncoder >> okResponse >> Task.succeed))
+                    |> andThenReturn (
+                        let
+                            round = table.round
+                        in
+                            ({ table | round =
+                                { round | players = Array.map (\player ->
+                                        if player.name == session.username then
+                                            player
+                                        else
+                                            { player | hand = [] }
+                                    ) round.players
+                                }
+                            }
+                            |> (encode gameEncoder >> okResponse >> Task.succeed)))
                 )
             |> onError logErrorAndReturn
         )

@@ -1,9 +1,13 @@
 module TichuModel exposing (..)
 
 import Time exposing (Time)
-import Array exposing (Array, initialize)
+import Array exposing (Array)
 import List exposing (..)
 import Maybe exposing (andThen)
+import Random exposing (initialSeed, step)
+import Random.List exposing (shuffle)
+
+
 import UserModel exposing (User)
 
 
@@ -294,36 +298,47 @@ type UpdateGame
     | UpdateRound (Round -> Round)
 
 
-initialGame : String -> Game
-initialGame name =
-    { name = name
-    , seed = 0
-    , users = Array.empty
-    , round = initRound allCards
-    , history = []
-    , messages = []
-    , log = []
-    }
+initGame : String -> Int -> List AwaitingTableUser -> Game
+initGame name seed users =
+    let
+        gameUsers =
+            Array.fromList <| List.map (\user ->
+                GameUser user.name user.lastCheck
+            ) users
+    in
+        { name = name
+        , seed = seed
+        , users = gameUsers
+        , round = initRound seed gameUsers
+        , history = []
+        , messages = []
+        , log = []
+        }
 
 
-initRound : List Card -> Round
-initRound cards =
-    { players = initialize 4 (\i -> initPlayer cards i)
-    , table = []
-    , actualPlayer = 0
-    , demand = Nothing
-    , demandCompleted = False
-    , seed = 0
-    }
+initRound : Int -> Array GameUser -> Round
+initRound seed users =
+    case step (shuffle allCards) (initialSeed seed) of
+        (cards, _) ->
+            { players = 
+                Array.indexedMap (\i user ->
+                    initPlayer cards user.name i
+                ) users
+            , table = []
+            , actualPlayer = 0
+            , demand = Nothing
+            , demandCompleted = False
+            , seed = seed
+            }
 
 
-initPlayer : List Card -> Int -> Player
-initPlayer cards offset =
+initPlayer : List Card -> String -> Int -> Player
+initPlayer cards name offset =
     { hand = sortWith cardOrder <| take 13 <| drop (offset * 13) cards
     , cardsOnHand = 14
     , collected = []
     , selection = []
-    , name = "test!"
+    , name = name
     , score = 0
     , tichu = False
     , sawAllCards = False
