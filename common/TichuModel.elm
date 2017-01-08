@@ -47,39 +47,21 @@ allowedRanks =
 rankWeight : Rank -> Int
 rankWeight rank =
     case rank of
-        R i ->
-            i
-
-        J ->
-            11
-
-        Q ->
-            12
-
-        K ->
-            13
-
-        A ->
-            14
+        R i -> i
+        J -> 11
+        Q -> 12
+        K -> 13
+        A -> 14
 
 
 cardWeight : Card -> Int
 cardWeight card =
     case card of
-        NormalCard suit rank ->
-            rankWeight rank
-
-        MahJong ->
-            1
-
-        Dog ->
-            0
-
-        Phoenix ->
-            15
-
-        Dragon ->
-            16
+        NormalCard suit rank -> rankWeight rank
+        MahJong -> 1
+        Dog -> 0
+        Phoenix -> 15
+        Dragon -> 16
 
 
 cardOrder : Card -> Card -> Order
@@ -246,6 +228,7 @@ type alias Player =
     , tichu : Bool
     , sawAllCards : Bool
     , grandTichu : Bool
+    , exchange : Maybe (Card, Card, Card)
     }
 
 
@@ -340,6 +323,7 @@ initPlayer cards offset =
     , tichu = False
     , sawAllCards = False
     , grandTichu = False
+    , exchange = Nothing
     }
 
 

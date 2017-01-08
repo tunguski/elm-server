@@ -26,7 +26,7 @@ round : Decoder Round
 round =
     Json.map5 Round
         (field "players" <| array player)
-        (field "table" <| list (list card))
+        (field "table" <| list cardsDecoder)
         (field "actualPlayer" int)
         (field "demand" (maybe rank))
         (field "demandCompleted" bool)
@@ -37,6 +37,15 @@ gameUser =
     Json.map2 GameUser
         (field "name" string)
         (field "lastCheck" float)
+
+
+cardsDecoder : Decoder (List Card)
+cardsDecoder =
+    list card
+
+
+decodeCards =
+    decodeString cardsDecoder
 
 
 card : Decoder Card
@@ -122,17 +131,26 @@ rank =
 player : Decoder Player
 player =
     map8 Player
-        (field "hand" <| list card)
+        (field "hand" <| cardsDecoder)
         (field "cardsOnHand" <| int)
-        (field "collected" <| list card)
-        (field "selection" <| list card)
+        (field "collected" <| cardsDecoder)
+        (field "selection" <| cardsDecoder)
         (field "name" string)
         (field "score" int)
         (field "tichu" bool)
         (field "sawAllCards" bool)
     |> andThen (\p ->
-        map p
+        map2 p
             (field "grandTichu" bool)
+            (field "exchange" (maybe
+                (cardsDecoder
+                |> andThen (\list ->
+                    case list of
+                        a :: b :: c :: t ->
+                            succeed (a, b, c)
+                        _ ->
+                            fail "Could not parse list with three elements"
+                ))))
     )
 
 
@@ -239,6 +257,12 @@ playerEncoder player =
         , ( "tichu", JE.bool player.tichu )
         , ( "sawAllCards", JE.bool player.tichu )
         , ( "grandTichu", JE.bool player.grandTichu )
+        , ( "exchange", case player.exchange of
+            Just (a, b, c) ->
+                listToValue cardEncoder [a, b, c]
+            Nothing ->
+                JE.null
+          )
         ]
 
 
@@ -284,8 +308,8 @@ awaitingTableDecoder : Decoder AwaitingTable
 awaitingTableDecoder =
     Json.map3 AwaitingTable
         (field "name" string)
-        (field "users" <| 
-            list 
+        (field "users" <|
+            list
                 (map3 AwaitingTableUser
                     (field "name" string)
                     (field "lastCheck" float)
@@ -300,7 +324,7 @@ awaitingTableEncoder table =
         [ ( "name", JE.string table.name )
         , ( "users"
           , JE.list
-                (List.map (\user -> 
+                (List.map (\user ->
                     JE.object
                         [ ("name", JE.string user.name)
                         , ("lastCheck", JE.float user.lastCheck)

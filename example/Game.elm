@@ -37,6 +37,7 @@ gamesApiPart api =
                             statusResponse 405 |> Result
                 )
             , PF "seeAllCards" (\() -> seeAllCards api id)
+            , PF "exchangeCards" (\() -> exchangeCards api id)
             , PF "declareTichu" (\() -> declareTichu api id)
             , PF "declareGrandTichu" (\() -> declareGrandTichu api id)
             , PF "pass" (\() -> pass api id)
@@ -123,6 +124,40 @@ pass api id =
                         round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
                     |> andThenReturn (statusResponse 200 |> Task.succeed)
                 False ->
+                    statusResponse 400 |> Task.succeed
+    )
+
+
+{-| Exchange cards
+
+1. Check is it start of round
+2. Check if player did not exchange cards
+3. Check if player did not
+4. Update actual player
+5. Save state
+
+-}
+exchangeCards : ApiPartApi msg -> String -> Partial msg
+exchangeCards api id =
+    doWithTable api id (\session table round player ->
+        let
+            exchangeCards = decodeCards api.request.body
+        in
+            case player.exchange of
+                Nothing ->
+                    case exchangeCards of
+                        Ok (a :: b :: c :: t) ->
+                            -- FIXME:
+                            put table.name { table | round =
+                                modifyPlayer round session.username
+                                    (\player -> { player | exchange = Just (a, b, c) })
+                            } games
+                            |> andThenReturn (statusResponse 200 |> Task.succeed)
+                        Ok _ ->
+                            statusResponse 400 |> Task.succeed
+                        Err msg ->
+                            statusResponse 400 |> Task.succeed
+                _ ->
                     statusResponse 400 |> Task.succeed
     )
 
