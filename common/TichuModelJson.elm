@@ -13,8 +13,9 @@ import Tuple
 
 gameDecoder : Decoder Game
 gameDecoder =
-    Json.map6 Game
+    Json.map7 Game
         (field "name" string)
+        (field "seed" (succeed 0))
         (field "users" <| array gameUser)
         (field "round" round)
         (field "history" <| list round)
@@ -24,12 +25,13 @@ gameDecoder =
 
 round : Decoder Round
 round =
-    Json.map5 Round
+    Json.map6 Round
         (field "players" <| array player)
         (field "table" <| list cardsDecoder)
         (field "actualPlayer" int)
         (field "demand" (maybe rank))
         (field "demandCompleted" bool)
+        (field "seed" (succeed 0))
 
 
 gameUser : Decoder GameUser
@@ -193,6 +195,7 @@ gameEncoder : Game -> Value
 gameEncoder game =
     JE.object
         [ ( "name", JE.string game.name )
+        , ( "seed", JE.int game.seed )
         , ( "users"
           , JE.array
                 (Array.map gameUserEncoder
@@ -280,6 +283,7 @@ roundEncoder round =
                     JE.null
           )
         , ( "demandCompleted", JE.bool round.demandCompleted )
+        , ( "seed", JE.int round.seed )
         ]
 
 
@@ -306,7 +310,7 @@ encodeSuit item =
 
 awaitingTableDecoder : Decoder AwaitingTable
 awaitingTableDecoder =
-    Json.map3 AwaitingTable
+    Json.map4 AwaitingTable
         (field "name" string)
         (field "users" <|
             list
@@ -316,12 +320,14 @@ awaitingTableDecoder =
                     (field "pressedStart" bool))
         )
         (field "test" bool)
+        (field "seed" (succeed 0))
 
 
 awaitingTableEncoder : AwaitingTable -> Value
 awaitingTableEncoder table =
     JE.object
         [ ( "name", JE.string table.name )
+        , ( "seed", JE.int table.seed )
         , ( "users"
           , JE.list
                 (List.map (\user ->

@@ -240,6 +240,7 @@ type alias Round =
     , actualPlayer : Int
     , demand : Maybe Rank
     , demandCompleted : Bool
+    , seed : Int
     }
 
 
@@ -264,6 +265,7 @@ type alias GameUser =
 
 type alias Game =
     { name : String
+    , seed : Int
     , users : Array GameUser
     , round : Round
     , history : List Round
@@ -283,6 +285,7 @@ type alias AwaitingTable =
     { name : String
     , users : List AwaitingTableUser
     , test : Bool
+    , seed : Int
     }
 
 
@@ -294,6 +297,7 @@ type UpdateGame
 initialGame : String -> Game
 initialGame name =
     { name = name
+    , seed = 0
     , users = Array.empty
     , round = initRound allCards
     , history = []
@@ -309,6 +313,7 @@ initRound cards =
     , actualPlayer = 0
     , demand = Nothing
     , demandCompleted = False
+    , seed = 0
     }
 
 

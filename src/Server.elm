@@ -98,11 +98,8 @@ parseRequest r =
                 Just { request
                      | method = method
                      , idSession = getIdSession request
-                     , test = case getHeader "X-Test-Session" request of
-                                Just _ ->
-                                    True
-                                Nothing ->
-                                    False
+                     , test = getHeaderDefault "X-Test-Session"
+                                (\_ -> True) False request
                      }
         Nothing ->
             Nothing
@@ -216,6 +213,13 @@ executeIfIdSessionExists request task =
             task id
         Nothing ->
             Task.fail (BadStatus (fakeResponse 404))
+
+
+getHeaderDefault : String -> (String -> a) -> a -> Request -> a
+getHeaderDefault key mapper default request =
+    getHeader key request
+    |> Maybe.map mapper
+    |> Maybe.withDefault default
 
 
 getHeader : String -> Request -> Maybe String

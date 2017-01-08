@@ -40,7 +40,7 @@ awaitingTablesApiPart api =
                             statusResponse 405 |> Result
                 )
             , P "join"
-                [ F (\() -> joinAwaitingTable api id) 
+                [ F (\() -> joinAwaitingTable api id)
                 ]
             , P "start"
                 [ F (\() -> startAwaitingTable api id)
@@ -86,7 +86,7 @@ startAwaitingTable api id =
                         -- 404?
                         statusResponse 404 |> Task.succeed
             )
-            |> onError logErrorAndReturn 
+            |> onError logErrorAndReturn
         )
 
 
@@ -101,12 +101,13 @@ createGame table r =
             a :: b :: c :: d :: [] ->
                 put table.name (Game
                     table.name
+                    table.seed
                     (Array.fromList <|
                         List.map (\user ->
                             GameUser user.name user.lastCheck
                         ) table.users
                     )
-                    (Round Array.empty [] 0 Nothing False)
+                    (Round Array.empty [] 0 Nothing False table.seed)
                     [] [] []) games
                 |> andThenReturn (succeed r)
             _ ->
@@ -136,7 +137,7 @@ joinAwaitingTable api id =
                         put id { table | users = (AwaitingTableUser session.username api.request.time False :: table.users) } awaitingTables
                         |> andThenReturn (statusResponse 201 |> Task.succeed)
             )
-            |> onError logErrorAndReturn 
+            |> onError logErrorAndReturn
         )
 
 
@@ -148,7 +149,7 @@ getAwaitingTable api id =
             get id awaitingTables
             |> andThen
                 (\table ->
-                    put id 
+                    put id
                         { table
                         | users = List.map (\user ->
                                         if user.name /= session.username then
@@ -177,6 +178,17 @@ postAwaitingTable api id =
                                     AwaitingTable id
                                         [ AwaitingTableUser session.username api.request.time False ]
                                         api.request.test
+                                        (if api.request.test then
+                                            getHeaderDefault "X-Test-Game-Seed"
+                                                (String.toInt >> (\r ->
+                                                    case r of
+                                                        Ok i -> i
+                                                        Err _ -> Basics.round api.request.time
+                                                ))
+                                                (Basics.round api.request.time)
+                                                api.request
+                                        else
+                                            0)
                             in
                                 put id table awaitingTables
                                     |> andThenReturn (Task.succeed table)

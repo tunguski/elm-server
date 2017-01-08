@@ -147,7 +147,6 @@ exchangeCards api id =
                 Nothing ->
                     case exchangeCards of
                         Ok (a :: b :: c :: t) ->
-                            -- FIXME:
                             put table.name { table | round =
                                 modifyPlayer round session.username
                                     (\player -> { player | exchange = Just (a, b, c) })
