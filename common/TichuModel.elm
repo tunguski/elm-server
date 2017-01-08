@@ -320,7 +320,7 @@ initRound : Int -> Array GameUser -> Round
 initRound seed users =
     case step (shuffle allCards) (initialSeed seed) of
         (cards, _) ->
-            { players = 
+            { players =
                 Array.indexedMap (\i user ->
                     initPlayer cards user.name i
                 ) users
@@ -334,7 +334,8 @@ initRound seed users =
 
 initPlayer : List Card -> String -> Int -> Player
 initPlayer cards name offset =
-    { hand = sortWith cardOrder <| take 14 <| drop (offset * 14) cards
+    { hand = {-sortWith cardOrder <|-}
+        take 14 <| drop (offset * 14) cards
     , cardsOnHand = 14
     , collected = []
     , selection = []

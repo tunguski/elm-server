@@ -146,7 +146,7 @@ exchangeCards api id =
             case player.exchange of
                 Nothing ->
                     case exchangeCards of
-                        Ok (a :: b :: c :: t) ->
+                        Ok (a :: b :: c :: []) ->
                             put table.name { table | round =
                                 modifyPlayer round session.username
                                     (\player -> { player | exchange = Just (a, b, c) })
@@ -240,7 +240,10 @@ declareGrandTichu : ApiPartApi msg -> String -> Partial msg
 declareGrandTichu api id =
     updateAndReturnIf api id
         (.sawAllCards >> not)
-        (\player -> { player | grandTichu = True })
+        (\player -> { player
+                    | grandTichu = True
+                    , sawAllCards = True
+                    })
 
 
 {-| If player does not want to play grand tichu, he may see all cards
@@ -256,6 +259,9 @@ seeAllCards api id =
         (\player -> { player | sawAllCards = True })
 
 
+{-| If condition is met (pass player to it), then
+    execute update function on player.
+-}
 updateAndReturnIf api id condition update =
     doWithTable api id (\session table round player ->
         if condition player then
@@ -291,15 +297,27 @@ getGame api id =
                         let
                             round = table.round
                         in
-                            ({ table | round =
-                                { round | players = Array.map (\player ->
+                            ({ table
+                             | round =
+                                { round
+                                | players = Array.map (\player ->
                                         if player.name == session.username then
-                                            player
+                                            if player.sawAllCards then
+                                                player
+                                            else
+                                                { player
+                                                | hand = List.take 8 player.hand
+                                                }
                                         else
-                                            { player | hand = [] }
+                                            { player
+                                            | hand = []
+                                            , exchange = Nothing
+                                            }
                                     ) round.players
+                                , seed = 0
                                 }
-                            }
+                             , seed = 0
+                             }
                             |> (encode gameEncoder >> okResponse >> Task.succeed)))
                 )
             |> onError logErrorAndReturn
