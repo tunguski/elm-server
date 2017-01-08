@@ -188,7 +188,7 @@ postAwaitingTable api id =
                                                 (Basics.round api.request.time)
                                                 api.request
                                         else
-                                            0)
+                                            (Basics.round api.request.time))
                             in
                                 put id table awaitingTables
                                     |> andThenReturn (Task.succeed table)
