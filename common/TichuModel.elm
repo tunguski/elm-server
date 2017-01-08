@@ -334,7 +334,7 @@ initRound seed users =
 
 initPlayer : List Card -> String -> Int -> Player
 initPlayer cards name offset =
-    { hand = sortWith cardOrder <| take 13 <| drop (offset * 13) cards
+    { hand = sortWith cardOrder <| take 14 <| drop (offset * 14) cards
     , cardsOnHand = 14
     , collected = []
     , selection = []
