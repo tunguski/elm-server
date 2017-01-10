@@ -103,6 +103,25 @@ doWithTable api id function =
     )
 
 
+orElse : Bool -> String -> Maybe String -> Maybe String
+orElse condition errorText maybe =
+    case maybe of
+        Just text ->
+            Just text
+        Nothing ->
+            case not condition of
+                True -> Nothing
+                False -> Just errorText
+
+
+executeIfNoError exec maybe =
+    case maybe of
+        Just error ->
+            response 400 (Debug.log "error: " error) |> Task.succeed
+        Nothing ->
+            exec
+
+
 {-| Pass player's move
 
 1. Check is it actual player
@@ -114,19 +133,15 @@ doWithTable api id function =
 pass : ApiPartApi msg -> String -> Partial msg
 pass api id =
     doWithTable api id (\session table round player ->
-        let
-            isActualPlayer =
-                (getActualPlayer round).name == session.username
-            hasDemandedCard = openDemandMatch round
-        in
-            case isActualPlayer && not hasDemandedCard of
-                True ->
-                    -- switch to next player and return ok
-                    put table.name { table |
-                        round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
-                    |> andThenReturn (statusResponse 200 |> Task.succeed)
-                False ->
-                    statusResponse 400 |> Task.succeed
+        Nothing
+        |> orElse ((getActualPlayer round).name == session.username) "Not an actual player"
+        |> orElse (not <| openDemandMatch round) "You have demanded card"
+        |> executeIfNoError (
+                -- switch to next player and return ok
+                put table.name { table |
+                    round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
+                |> andThenReturn (statusResponse 200 |> Task.succeed)
+        )
     )
 
 
