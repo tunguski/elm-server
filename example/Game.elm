@@ -49,9 +49,8 @@ gamesApiPart api =
 
 getActualPlayer : Round -> Player
 getActualPlayer round =
-    case Array.get (round.actualPlayer % 4) round.players of
-        Just player -> player
-        Nothing -> Debug.crash "Malformed state"
+    Array.get (round.actualPlayer % 4) round.players
+    |> defaultCrash ("Malformed state getActualPlayer: " ++ toString round)
 
 
 openDemand round =
@@ -74,21 +73,24 @@ openDemandMatch round =
             False
 
 
+defaultCrash text item =
+    case item of
+        Just value -> value
+        Nothing -> Debug.crash text
+
+
 getPlayer round name =
     Array.filter (.name >> (==) name) round.players
     |> Array.get 0
-    |> Maybe.map identity
-    |> Maybe.withDefault (Debug.crash "Malformed state")
+    |> defaultCrash ("Malformed state getPlayer: " ++ name ++ ": " ++ toString round)
 
 
 modifyPlayer round name function =
     { round | players =
         Array.map (\player ->
             case player.name == name of
-                True ->
-                    function player
-                False ->
-                    player
+                True -> function player
+                False -> player
         ) round.players
     }
 
