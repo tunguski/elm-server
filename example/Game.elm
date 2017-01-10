@@ -109,7 +109,7 @@ orElse condition errorText maybe =
         Just text ->
             Just text
         Nothing ->
-            case not condition of
+            case condition of
                 True -> Nothing
                 False -> Just errorText
 
