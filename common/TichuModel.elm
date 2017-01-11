@@ -316,6 +316,10 @@ initGame name seed users =
         }
 
 
+hasCard card player =
+    List.member card player.hand
+
+
 initRound : Int -> Array GameUser -> Round
 initRound seed users =
     case step (shuffle allCards) (initialSeed seed) of
@@ -330,6 +334,18 @@ initRound seed users =
             , demandCompleted = False
             , seed = seed
             }
+    -- set actual player by seeking MahJong
+    |> (\round ->
+        { round | actualPlayer =
+            Array.toIndexedList round.players
+            |> List.foldl (\(i, user) before ->
+                case List.member MahJong user.hand of
+                    True -> Just i
+                    False -> before
+            ) Nothing
+            |> Maybe.withDefault 0
+        }
+    )
 
 
 initPlayer : List Card -> String -> Int -> Player

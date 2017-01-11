@@ -134,8 +134,10 @@ pass : ApiPartApi msg -> String -> Partial msg
 pass api id =
     doWithTable api id (\session table round player ->
         Nothing
+        |> orElse player.sawAllCards "Before playing you have to decide playing Grand Tichu or not"
         |> orElse ((getActualPlayer round).name == session.username) "Not an actual player"
         |> orElse (not <| openDemandMatch round) "You have demanded card"
+        |> orElse (hasCard MahJong player) "You have MahJong"
         |> executeIfNoError (
                 -- switch to next player and return ok
                 put table.name { table |
