@@ -5,6 +5,7 @@ module Rest exposing (RestResult,
                       config,
                       ignoreError,
                       andThenReturn,
+                      withBody,
                       withHeader,
                       withQueryParams,
                       get,
@@ -41,7 +42,7 @@ type alias RestConfig item =
 
 
 restCollection : String -> String -> Json.Decoder item -> (item -> JE.Value) -> Rest item
-restCollection baseUrl collectionName decoder encoder = 
+restCollection baseUrl collectionName decoder encoder =
     Rest (RestConfig baseUrl collectionName decoder encoder) []
 
 
@@ -62,8 +63,15 @@ andThenReturn fn task =
     Task.andThen (\result -> fn) task
 
 
-withHeader : String -> String -> Rest item -> Rest item 
-withHeader key value rest = 
+withBody : String -> Rest item -> Rest item
+withBody body rest =
+    case rest of
+        Rest config modifiers ->
+            Rest config (modifiers ++ [ HttpBuilder.withStringBody "application/json" body ])
+
+
+withHeader : String -> String -> Rest item -> Rest item
+withHeader key value rest =
     case rest of
         Rest config modifiers ->
             Rest config (modifiers ++ [ HttpBuilder.withHeader key value ])
@@ -76,12 +84,12 @@ withQueryParams params rest =
             Rest config (modifiers ++ [ HttpBuilder.withQueryParams params ])
 
 
-apply : List (RequestBuilder item -> RequestBuilder item) -> RequestBuilder item -> RequestBuilder item 
+apply : List (RequestBuilder item -> RequestBuilder item) -> RequestBuilder item -> RequestBuilder item
 apply modifiers builder =
     -- fold all modifiers
     List.foldl (\modifier b ->
         modifier b
-    ) builder modifiers 
+    ) builder modifiers
 
 
 baseQuery : Rest item -> (RestConfig item -> RequestBuilder item -> RequestBuilder a) -> Task Error a
@@ -105,19 +113,19 @@ subResource name builder =
 
 get : String -> Rest item -> Task Error item
 get itemId rest =
-  baseQuery rest (\config -> 
+  baseQuery rest (\config ->
     subResource itemId)
 
 
 findAll : Rest item -> Task Error (List item)
 findAll rest =
-    baseQuery rest 
-        (withExpect << Http.expectJson << Json.list << .decoder) 
+    baseQuery rest
+        (withExpect << Http.expectJson << Json.list << .decoder)
 
 
 post : String -> item -> Rest item -> Task Error String
 post itemId item rest =
-    baseQuery rest (\config -> 
+    baseQuery rest (\config ->
         subResource itemId
         >> withMethod "post"
         >> withJsonBody (config.encoder item)
@@ -127,7 +135,7 @@ post itemId item rest =
 
 postCommand : String -> Rest item -> Task Error String
 postCommand command rest =
-    baseQuery rest (\config -> 
+    baseQuery rest (\config ->
         subResource command
         >> withMethod "post"
         >> HttpBuilder.withHeader "Content-Type" "application/json"
@@ -136,7 +144,7 @@ postCommand command rest =
 
 put : String -> item -> Rest item -> Task Error String
 put itemId item rest =
-    baseQuery rest (\config -> 
+    baseQuery rest (\config ->
         subResource itemId
         >> withMethod "put"
         >> withJsonBody (config.encoder item)
@@ -146,7 +154,7 @@ put itemId item rest =
 
 delete : String -> Rest item -> Task Error String
 delete itemId rest =
-    baseQuery rest (\config -> 
+    baseQuery rest (\config ->
         subResource itemId
         >> withMethod "delete"
         >> withExpect Http.expectString)
