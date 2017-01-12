@@ -258,7 +258,7 @@ playerEncoder player =
         , ( "name", JE.string player.name )
         , ( "score", JE.int player.score )
         , ( "tichu", JE.bool player.tichu )
-        , ( "sawAllCards", JE.bool player.tichu )
+        , ( "sawAllCards", JE.bool player.sawAllCards )
         , ( "grandTichu", JE.bool player.grandTichu )
         , ( "exchange", case player.exchange of
             Just (a, b, c) ->

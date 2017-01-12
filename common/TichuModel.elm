@@ -339,7 +339,7 @@ initRound seed users =
         { round | actualPlayer =
             Array.toIndexedList round.players
             |> List.foldl (\(i, user) before ->
-                case List.member MahJong user.hand of
+                case hasCard MahJong user of
                     True -> Just i
                     False -> before
             ) Nothing

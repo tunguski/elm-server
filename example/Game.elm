@@ -10,7 +10,7 @@ import Http exposing (Error(..))
 
 import ApiPartApi exposing (..)
 import BaseModel exposing (..)
-import ExampleDb exposing (..)
+import ExampleDb exposing (games)
 import MongoDb exposing (..)
 import Rest exposing (..)
 import Server exposing (..)
@@ -139,10 +139,10 @@ pass api id =
         |> orElse (not <| openDemandMatch round) "You have demanded card"
         |> orElse (hasCard MahJong player) "You have MahJong"
         |> executeIfNoError (
-                -- switch to next player and return ok
-                put table.name { table |
-                    round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
-                |> andThenReturn (statusResponse 200 |> Task.succeed)
+            -- switch to next player and return ok
+            put table.name { table |
+                round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
+            |> andThenReturn (statusResponse 200 |> Task.succeed)
         )
     )
 
