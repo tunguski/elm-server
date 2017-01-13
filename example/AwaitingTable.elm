@@ -127,7 +127,11 @@ joinAwaitingTable api id =
                     True ->
                         statusResponse 204 |> Task.succeed
                     False ->
-                        put id { table | users = (AwaitingTableUser session.username api.request.time False :: table.users) } awaitingTables
+                        put id { table | users = 
+                            (table.users 
+                             ++
+                             [ AwaitingTableUser session.username api.request.time False ] )
+                        } awaitingTables
                         |> andThenReturn (statusResponse 201 |> Task.succeed)
             )
             |> onError logErrorAndReturn
@@ -221,7 +225,6 @@ listAwaitingTables api =
                             toUpdate
 
                     toRemove =
-                        Debug.log "toRemove"
                         (List.filter (.users >> List.isEmpty) tables)
                             ++ (List.filter (.users >> List.isEmpty) updated)
                 in

@@ -238,6 +238,11 @@ cardEncoder card =
                 [ ( "type", JE.string (toString card) ) ]
 
 
+encodeCards : Cards -> String
+encodeCards cards =
+    encode JE.list (List.map cardEncoder cards)
+
+
 rankEncoder : Rank -> Value
 rankEncoder rank =
     JE.string <|

@@ -49,7 +49,7 @@ gamesApiPart api =
 
 getActualPlayer : Round -> Player
 getActualPlayer round =
-    Array.get (round.actualPlayer % 4) round.players
+    Array.get round.actualPlayer round.players
     |> defaultCrash ("Malformed state getActualPlayer: " ++ toString round)
 
 
@@ -201,24 +201,26 @@ hand api id =
             isDemandedCardInTrick = cardInTrick round.demand player.selection
             isBomb = bomb trick
             bombEnoughPower = True
+            playCards =
+                put table.name { table |
+                    round = { round
+                        | actualPlayer = (round.actualPlayer + 1) % 4
+                    }
+                } games
+                |> andThenReturn (statusResponse 200 |> Task.succeed)
         in
             if isActualPlayer then
                 if isOpenDemand then
                     if hasDemandedCard then
                         if isDemandedCardInTrick then
-                            statusResponse 400 |> Task.succeed
+                            playCards
                         else
-                            statusResponse 400 |> Task.succeed
+                            response 400 "You have to play demanded card" |> Task.succeed
                     else
-                        statusResponse 400 |> Task.succeed
+                        playCards
                 else
                     -- play, switch to next player and return ok
-                    put table.name { table |
-                        round = { round
-                            | actualPlayer = round.actualPlayer + 1 % 4
-                        }
-                    } games
-                    |> andThenReturn (statusResponse 200 |> Task.succeed)
+                    playCards
             else
                 if isBomb then
                     if bombEnoughPower then
@@ -230,9 +232,9 @@ hand api id =
                         } games
                         |> andThenReturn (statusResponse 200 |> Task.succeed)
                     else
-                        statusResponse 400 |> Task.succeed
+                        response 400 "Too weak bomb" |> Task.succeed
                 else
-                    statusResponse 400 |> Task.succeed
+                    response 400 "You are not actual player" |> Task.succeed
     )
 
 
