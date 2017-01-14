@@ -85,7 +85,7 @@ getPlayer round name =
     |> defaultCrash ("Malformed state getPlayer: " ++ name ++ ": " ++ toString round)
 
 
-modifyPlayer round name function =
+modifyPlayer name function round =
     { round | players =
         Array.map (\player ->
             case player.name == name of
@@ -122,6 +122,10 @@ executeIfNoError exec maybe =
             exec
 
 
+incActualPlayer round =
+    { round | actualPlayer = (round.actualPlayer + 1) % 4 }
+
+
 {-| Pass player's move
 
 1. Check is it actual player
@@ -137,11 +141,10 @@ pass api id =
         |> orElse player.sawAllCards "Before playing you have to decide playing Grand Tichu or not"
         |> orElse ((getActualPlayer round).name == session.username) "Not an actual player"
         |> orElse (not <| openDemandMatch round) "You have demanded card"
-        |> orElse (hasCard MahJong player) "You have MahJong"
+        |> orElse (not <| hasCard MahJong player) "You have MahJong"
         |> executeIfNoError (
             -- switch to next player and return ok
-            put table.name { table |
-                round = { round | actualPlayer = round.actualPlayer + 1 % 4 } } games
+            put table.name { table | round = incActualPlayer round } games
             |> andThenReturn (statusResponse 200 |> Task.succeed)
         )
     )
@@ -167,8 +170,9 @@ exchangeCards api id =
                     case exchangeCards of
                         Ok (a :: b :: c :: []) ->
                             put table.name { table | round =
-                                modifyPlayer round session.username
+                                modifyPlayer session.username
                                     (\player -> { player | exchange = Just (a, b, c) })
+                                    round
                             } games
                             |> andThenReturn (statusResponse 200 |> Task.succeed)
                         Ok _ ->
@@ -178,6 +182,50 @@ exchangeCards api id =
                 _ ->
                     statusResponse 400 |> Task.succeed
     )
+
+
+removeCards cards hand =
+    List.filter (\c -> not <| List.member c cards) hand
+
+
+handWithParsedCards table round player param =
+    let
+        playCards =
+            put table.name { table |
+                round = incActualPlayer round 
+                    |> modifyPlayer player.name 
+                        ((\player ->
+                            { player | hand = removeCards param.parsedCards player.hand }
+                        )
+                        >>
+                        (\player ->
+                            { player | cardsOnHand = List.length player.hand }
+                        ))
+            } games
+            |> andThenReturn (statusResponse 200 |> Task.succeed)
+    in
+        if param.isActualPlayer then
+            if param.isOpenDemand then
+                if param.hasDemandedCard then
+                    if param.isDemandedCardInTrick then
+                        playCards
+                    else
+                        response 400 "You have to play demanded card" |> Task.succeed
+                else
+                    playCards
+            else
+                -- play, switch to next player and return ok
+                playCards
+        else
+            if param.isBomb then
+                if param.bombEnoughPower then
+                    -- play, switch to next player and return ok
+                    put table.name { table | round = incActualPlayer round } games
+                    |> andThenReturn (statusResponse 200 |> Task.succeed)
+                else
+                    response 400 "Too weak bomb" |> Task.succeed
+            else
+                response 400 "You are not actual player" |> Task.succeed
 
 
 {-| Place a hand on table
@@ -192,49 +240,23 @@ exchangeCards api id =
 hand : ApiPartApi msg -> String -> Partial msg
 hand api id =
     doWithTable api id (\session table round player ->
-        let
-            isActualPlayer =
-                (getActualPlayer round).name == session.username
-            hasDemandedCard = openDemandMatch round
-            isOpenDemand = openDemand round
-            trick = parseTrick round session.username
-            isDemandedCardInTrick = cardInTrick round.demand player.selection
-            isBomb = bomb trick
-            bombEnoughPower = True
-            playCards =
-                put table.name { table |
-                    round = { round
-                        | actualPlayer = (round.actualPlayer + 1) % 4
+        case decodeCards api.request.body of
+            Ok cards ->
+                handWithParsedCards
+                    table
+                    round
+                    player
+                    { isActualPlayer = (getActualPlayer round).name == session.username
+                    , hasDemandedCard = openDemandMatch round
+                    , isOpenDemand = openDemand round
+                    , parsedCards = cards
+                    , trick = parseTrick cards
+                    , isDemandedCardInTrick = cardInTrick round.demand player.selection
+                    , isBomb = bomb (parseTrick cards)
+                    , bombEnoughPower = True
                     }
-                } games
-                |> andThenReturn (statusResponse 200 |> Task.succeed)
-        in
-            if isActualPlayer then
-                if isOpenDemand then
-                    if hasDemandedCard then
-                        if isDemandedCardInTrick then
-                            playCards
-                        else
-                            response 400 "You have to play demanded card" |> Task.succeed
-                    else
-                        playCards
-                else
-                    -- play, switch to next player and return ok
-                    playCards
-            else
-                if isBomb then
-                    if bombEnoughPower then
-                        -- play, switch to next player and return ok
-                        put table.name { table |
-                            round = { round
-                                | actualPlayer = round.actualPlayer + 1 % 4
-                            }
-                        } games
-                        |> andThenReturn (statusResponse 200 |> Task.succeed)
-                    else
-                        response 400 "Too weak bomb" |> Task.succeed
-                else
-                    response 400 "You are not actual player" |> Task.succeed
+            _ ->
+                response 400 "Malformed cards" |> Task.succeed
     )
 
 
@@ -287,7 +309,7 @@ updateAndReturnIf api id condition update =
     doWithTable api id (\session table round player ->
         if condition player then
             put table.name { table | round =
-                modifyPlayer round session.username update
+                modifyPlayer session.username update round
             } games
             |> andThenReturn (statusResponse 200 |> Task.succeed)
         else

@@ -190,8 +190,8 @@ allowedCombination table combination =
     False
 
 
-parseTrick : Round -> String -> Maybe Combination
-parseTrick round name =
+parseTrick : Cards -> Maybe Combination
+parseTrick cards =
     Nothing
 
 
