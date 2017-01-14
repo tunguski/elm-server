@@ -1,7 +1,6 @@
 module TichuModel exposing (..)
 
 import Time exposing (Time)
-import Array exposing (Array)
 import List exposing (..)
 import Maybe exposing (andThen)
 import Random exposing (initialSeed, step)
@@ -238,7 +237,7 @@ type alias Player =
 
 type alias Round =
     -- players in order, first has to play
-    { players : Array Player
+    { players : List Player
     -- hands on table
     , table : List Cards
     , actualPlayer : Int
@@ -270,7 +269,7 @@ type alias GameUser =
 type alias Game =
     { name : String
     , seed : Int
-    , users : Array GameUser
+    , users : List GameUser
     , round : Round
     , history : List Round
     , messages : List Message
@@ -302,7 +301,7 @@ initGame : String -> Int -> List AwaitingTableUser -> Game
 initGame name seed users =
     let
         gameUsers =
-            Array.fromList <| List.map (\user ->
+            List.map (\user ->
                 GameUser user.name user.lastCheck
             ) users
     in
@@ -320,12 +319,12 @@ hasCard card player =
     List.member card player.hand
 
 
-initRound : Int -> Array GameUser -> Round
+initRound : Int -> List GameUser -> Round
 initRound seed users =
     case step (shuffle allCards) (initialSeed seed) of
         (cards, _) ->
             { players =
-                Array.indexedMap (\i user ->
+                List.indexedMap (\i user ->
                     initPlayer cards user.name i
                 ) users
             , table = []
@@ -337,7 +336,7 @@ initRound seed users =
     -- set actual player by seeking MahJong
     |> (\round ->
         { round | actualPlayer =
-            Array.toIndexedList round.players
+            List.indexedMap (,) round.players
             |> List.foldl (\(i, user) before ->
                 case hasCard MahJong user of
                     True -> Just i
@@ -362,5 +361,76 @@ initPlayer cards name offset =
     , grandTichu = False
     , exchange = Nothing
     }
+
+
+openDemand round =
+    case round.demand of
+        Just r -> not round.demandCompleted
+        Nothing -> False
+
+
+openDemandMatch round =
+    case round.demand of
+        Just r ->
+            List.any (\card ->
+                case card of
+                    NormalCard suit rank ->
+                        (not round.demandCompleted) && (rank == r)
+                    _ ->
+                        False
+            ) (getActualPlayer round).hand
+        Nothing ->
+            False
+
+
+defaultCrash text item =
+    case item of
+        Just value -> value
+        Nothing -> Debug.crash text
+
+
+getPlayer round name =
+    List.filter (.name >> (==) name) round.players
+    |> List.head
+    |> defaultCrash ("Malformed state getPlayer: " ++ name ++ ": " ++ toString round)
+
+
+modifyPlayer name function round =
+    { round | players =
+        List.map (\player ->
+            case player.name == name of
+                True -> function player
+                False -> player
+        ) round.players
+    }
+
+
+getActualPlayer : Round -> Player
+getActualPlayer round =
+    round.players
+    |> List.drop round.actualPlayer
+    |> List.head
+    |> defaultCrash ("Malformed state getActualPlayer: " ++ toString round)
+
+
+incActualPlayer round =
+    { round | actualPlayer = (round.actualPlayer + 1) % 4 }
+
+
+removeCards cards hand =
+    List.filter (\c -> not <| List.member c cards) hand
+
+
+{-| Exchange cards between players
+-}
+exchangeCardsBetweenPlayers table =
+    let
+        round = table.round
+    in
+        { table | round =
+            { round
+            | players = round.players
+            }
+        }
 
 

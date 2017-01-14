@@ -1,7 +1,6 @@
 module AwaitingTable exposing (..)
 
 
-import Array
 import String
 import Task exposing (..)
 import Time exposing (second)

@@ -34,6 +34,21 @@ function startElmServer() {
         reqRes.res.statusCode = response.statusCode;
       }
       if (response.body) {
+
+        function isJsonString(str) {
+          try {
+            JSON.parse(str);
+          } catch (e) {
+            return false;
+          }
+          return true;
+        }
+
+        if (isJsonString(response.body)
+            && !response.headers["Content-Type"]) {
+          reqRes.res.setHeader("Content-Type", "application/json");
+        }
+
         reqRes.res.write(response.body);
       }
       reqRes.res.end();

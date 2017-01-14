@@ -83,19 +83,16 @@ getGuestSession api withSessionMaybe =
 processGetSessionError request error =
     case error of
         BadStatus response ->
-            RandomTask.randomInt
+            RandomTask.randomIdentifier
             |> andThen (\token ->
                let
-                   stringToken =
-                       toString token
-
                    newSession =
-                       Session stringToken stringToken (Date.fromTime request.time) 
-                           (Date.fromTime request.time) stringToken
+                       Session token token (Date.fromTime request.time)
+                           (Date.fromTime request.time) token
                in
-                   put stringToken newSession sessions
+                   put token newSession sessions
                    |> andThen (\s ->
-                       put stringToken (User stringToken stringToken "guest" stringToken 1500) users
+                       put token (User token token "guest" token 1500) users
                        |> andThenReturn (Task.succeed newSession)
                    )
             )

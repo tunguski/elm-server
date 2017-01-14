@@ -1,7 +1,6 @@
 module Game exposing (..)
 
 
-import Array
 import String
 import Task exposing (..)
 import Time exposing (second)
@@ -47,54 +46,6 @@ gamesApiPart api =
         ]
 
 
-getActualPlayer : Round -> Player
-getActualPlayer round =
-    Array.get round.actualPlayer round.players
-    |> defaultCrash ("Malformed state getActualPlayer: " ++ toString round)
-
-
-openDemand round =
-    case round.demand of
-        Just r -> not round.demandCompleted
-        Nothing -> False
-
-
-openDemandMatch round =
-    case round.demand of
-        Just r ->
-            List.any (\card ->
-                case card of
-                    NormalCard suit rank ->
-                        (not round.demandCompleted) && (rank == r)
-                    _ ->
-                        False
-            ) (getActualPlayer round).hand
-        Nothing ->
-            False
-
-
-defaultCrash text item =
-    case item of
-        Just value -> value
-        Nothing -> Debug.crash text
-
-
-getPlayer round name =
-    Array.filter (.name >> (==) name) round.players
-    |> Array.get 0
-    |> defaultCrash ("Malformed state getPlayer: " ++ name ++ ": " ++ toString round)
-
-
-modifyPlayer name function round =
-    { round | players =
-        Array.map (\player ->
-            case player.name == name of
-                True -> function player
-                False -> player
-        ) round.players
-    }
-
-
 doWithTable api id function =
     api.doWithSession (\session ->
         get id games |> andThen (\table ->
@@ -122,10 +73,6 @@ executeIfNoError exec maybe =
             exec
 
 
-incActualPlayer round =
-    { round | actualPlayer = (round.actualPlayer + 1) % 4 }
-
-
 {-| Pass player's move
 
 1. Check is it actual player
@@ -150,6 +97,12 @@ pass api id =
     )
 
 
+ifNothing maybe =
+    case maybe of
+        Just _ -> False
+        Nothing -> True
+
+
 {-| Exchange cards
 
 1. Check is it start of round
@@ -162,45 +115,57 @@ pass api id =
 exchangeCards : ApiPartApi msg -> String -> Partial msg
 exchangeCards api id =
     doWithTable api id (\session table round player ->
-        let
-            exchangeCards = decodeCards api.request.body
-        in
-            case player.exchange of
-                Nothing ->
+        Nothing
+        |> orElse (ifNothing player.exchange) "You have exchanged already"
+        |> executeIfNoError (
+            let
+                exchangeCards = decodeCards api.request.body
+                hasAllCards =
                     case exchangeCards of
-                        Ok (a :: b :: c :: []) ->
-                            put table.name { table | round =
+                        Ok cards ->
+                            List.all (flip hasCard <| player) cards
+                        Err _ ->
+                            False
+            in
+                if hasAllCards then
+                case exchangeCards of
+                    Ok (a :: b :: c :: []) ->
+                        put table.name
+                            ({ table | round =
                                 modifyPlayer session.username
                                     (\player -> { player | exchange = Just (a, b, c) })
                                     round
-                            } games
-                            |> andThenReturn (statusResponse 200 |> Task.succeed)
-                        Ok _ ->
-                            statusResponse 400 |> Task.succeed
-                        Err msg ->
-                            statusResponse 400 |> Task.succeed
-                _ ->
-                    statusResponse 400 |> Task.succeed
+                            }
+                            |> (\t ->
+                                case List.all (\p -> not <| ifNothing p.exchange) t.round.players of
+                                    True ->
+                                        exchangeCardsBetweenPlayers t
+                                    False ->
+                                        t
+                            ))
+                        games
+                        |> andThenReturn (statusResponse 200 |> Task.succeed)
+                    Ok _ ->
+                        response 400 "You have to exchange exactly 3 cards" |> Task.succeed
+                    Err msg ->
+                        response 400 "Could not decode exchanged cards" |> Task.succeed
+                else
+                    response 400 "Tried to exchange card you don't own" |> Task.succeed
+        )
     )
-
-
-removeCards cards hand =
-    List.filter (\c -> not <| List.member c cards) hand
 
 
 handWithParsedCards table round player param =
     let
         playCards =
             put table.name { table |
-                round = incActualPlayer round 
-                    |> modifyPlayer player.name 
-                        ((\player ->
-                            { player | hand = removeCards param.parsedCards player.hand }
-                        )
-                        >>
-                        (\player ->
-                            { player | cardsOnHand = List.length player.hand }
-                        ))
+                round = incActualPlayer round
+                    |> modifyPlayer player.name
+                        (\player -> { player
+                            | hand = removeCards param.parsedCards player.hand
+                            , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
+                        })
+                    |> Debug.log "handWithParsedCards"
             } games
             |> andThenReturn (statusResponse 200 |> Task.succeed)
     in
@@ -242,19 +207,29 @@ hand api id =
     doWithTable api id (\session table round player ->
         case decodeCards api.request.body of
             Ok cards ->
-                handWithParsedCards
-                    table
-                    round
-                    player
-                    { isActualPlayer = (getActualPlayer round).name == session.username
-                    , hasDemandedCard = openDemandMatch round
-                    , isOpenDemand = openDemand round
-                    , parsedCards = cards
-                    , trick = parseTrick cards
-                    , isDemandedCardInTrick = cardInTrick round.demand player.selection
-                    , isBomb = bomb (parseTrick cards)
-                    , bombEnoughPower = True
-                    }
+                Nothing
+                |> orElse (List.all (flip hasCard <| player) cards) "Tried to play card you don't own"
+                |> orElse (List.all (\player ->
+                        case player.exchange of
+                            Just _ -> True
+                            Nothing -> False
+                    ) round.players
+                ) "You have to exchange cards first"
+                |> executeIfNoError (
+                    handWithParsedCards
+                        table
+                        round
+                        player
+                        { isActualPlayer = (getActualPlayer round).name == session.username
+                        , isOpenDemand = openDemand round
+                        , hasDemandedCard = openDemandMatch round
+                        , parsedCards = cards
+                        , trick = parseTrick cards
+                        , isDemandedCardInTrick = cardInTrick round.demand cards
+                        , isBomb = bomb (parseTrick cards)
+                        , bombEnoughPower = True
+                        }
+                )
             _ ->
                 response 400 "Malformed cards" |> Task.succeed
     )
@@ -328,7 +303,7 @@ getGame api id =
                 (\table ->
                     put id
                         { table
-                        | users = Array.map (\user ->
+                        | users = List.map (\user ->
                                         if user.name /= session.username then
                                             user
                                         else
@@ -343,7 +318,7 @@ getGame api id =
                             ({ table
                              | round =
                                 { round
-                                | players = Array.map (\player ->
+                                | players = List.map (\player ->
                                         if player.name == session.username then
                                             if player.sawAllCards then
                                                 player

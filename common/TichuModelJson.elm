@@ -1,6 +1,5 @@
 module TichuModelJson exposing (..)
 
-import Array
 import Date exposing (Date)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
@@ -16,7 +15,7 @@ gameDecoder =
     Json.map7 Game
         (field "name" string)
         (field "seed" (succeed 0))
-        (field "users" <| array gameUser)
+        (field "users" <| list gameUser)
         (field "round" round)
         (field "history" <| list round)
         (field "messages" <| list message)
@@ -26,7 +25,7 @@ gameDecoder =
 round : Decoder Round
 round =
     Json.map6 Round
-        (field "players" <| array player)
+        (field "players" <| list player)
         (field "table" <| list cardsDecoder)
         (field "actualPlayer" int)
         (field "demand" (maybe rank))
@@ -197,10 +196,7 @@ gameEncoder game =
         [ ( "name", JE.string game.name )
         , ( "seed", JE.int game.seed )
         , ( "users"
-          , JE.array
-                (Array.map gameUserEncoder
-                    game.users
-                )
+          , JE.list (List.map gameUserEncoder game.users)
           )
         , ( "round", roundEncoder game.round )
         , ( "history", JE.list (List.map roundEncoder game.history) )
@@ -277,7 +273,7 @@ playerEncoder player =
 roundEncoder : Round -> Value
 roundEncoder round =
     JE.object
-        [ ( "players", arrayToValue playerEncoder round.players )
+        [ ( "players", listToValue playerEncoder round.players )
         , ( "table", listToValue (List.map cardEncoder >> JE.list) round.table )
         , ( "actualPlayer", JE.int round.actualPlayer )
         , ( "demand",
