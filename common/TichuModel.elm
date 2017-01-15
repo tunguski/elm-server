@@ -97,6 +97,19 @@ type
     | SingleCard Int
 
 
+{-| Check does first combination is stronger than second
+-}
+isSameTrickAndStronger : Combination -> Combination -> Bool
+isSameTrickAndStronger c1 c2 =
+    case (c1, c2) of
+        (SingleCard i1, SingleCard i2) -> i1 > i2
+        (Pair r1, Pair r2) -> rankWeight r1 > rankWeight r2
+        (PairStairs b1 i1, PairStairs b2 i2) -> i1 == i2 && rankWeight b1 > rankWeight b2
+        (Three r1, Three r2) -> rankWeight r1 > rankWeight r2
+        (Straight r1 i1, Straight r2 i2) -> i1 == i2 && rankWeight r1 > rankWeight r2
+        (FullHouse r1, FullHouse r2) -> rankWeight r1 > rankWeight r2
+        _ -> False
+
 
 -- a single card;
 
@@ -146,23 +159,22 @@ nextPairPower ( r, i ) card =
 calculatePairStraitPower : Card -> Card -> Maybe Card
 calculatePairStraitPower a b =
     ((pair [ a, b ])
-        |> andThen
-            (\combination ->
-                case combination of
-                    Pair rank ->
-                        case a of
-                            NormalCard s r ->
-                                if ((rankWeight r) == 0 || (rankWeight r) == (rankWeight rank) + 1) then
-                                    Just a
-                                else
-                                    Nothing
-
-                            _ ->
-                                Nothing
+    |> andThen (\combination ->
+        case combination of
+            Pair rank ->
+                case a of
+                    NormalCard s r ->
+                        if ((rankWeight r) == 0 || (rankWeight r) == (rankWeight rank) + 1) then
+                            Just a
+                        else
+                            Nothing
 
                     _ ->
                         Nothing
-            )
+
+            _ ->
+                Nothing
+        )
     )
 
 
@@ -180,19 +192,75 @@ extractPairStairs combination =
 
 
 -- three of a kind;
+three : Cards -> Maybe Combination
+three cards =
+    case cards of
+        [ NormalCard s1 r1, NormalCard s2 r2, NormalCard s3 r3 ] ->
+            if r1 == r2 && r2 == r3 then
+                Just (Three r1)
+            else
+                Nothing
+        _ ->
+            Nothing
+
+
 -- straights of at least five cards in length, regardless of suit/color (so 56789TJQ is playable);
+straight : Cards -> Maybe Combination
+straight cards =
+    Nothing
+
+
 -- and full houses (three of a kind & a pair).
+fullHouse : Cards -> Maybe Combination
+fullHouse cards =
+    Nothing
+
+
 -- Four of a kind or a straight flush of at least five cards is a bomb
+four : Cards -> Maybe Combination
+four cards =
+    case cards of
+        [ NormalCard s1 r1, NormalCard s2 r2, NormalCard s3 r3, NormalCard s4 r4 ] ->
+            if r1 == r2 && r2 == r3 && r3 == r4 then
+                Just (Four r1)
+            else
+                Nothing
+        _ ->
+            Nothing
 
 
-allowedCombination : Cards -> Cards -> Bool
+
+
+allowedCombination : Maybe Cards -> Cards -> Bool
 allowedCombination table combination =
-    False
+    case parseTrick combination of
+        Just trick ->
+            case Maybe.andThen parseTrick table of
+                Just trickOnTable ->
+                    isSameTrickAndStronger trick trickOnTable
+                Nothing ->
+                    True
+        Nothing ->
+            False
+
+
+tryParse parser (combination, cards) =
+    case combination of
+        Just _ -> (combination, cards)
+        Nothing -> (parser cards, cards)
 
 
 parseTrick : Cards -> Maybe Combination
 parseTrick cards =
-    Nothing
+    (Nothing, cards)
+    |> tryParse highCard
+    |> tryParse pair
+    |> tryParse three
+    |> tryParse four
+    |> tryParse fullHouse
+    |> tryParse straight
+    |> tryParse pairStairs
+    |> Tuple.first
 
 
 cardInTrick : Maybe Rank -> Cards -> Bool
@@ -353,8 +421,7 @@ initRound seed users =
 
 initPlayer : List Card -> String -> Int -> Player
 initPlayer cards name offset =
-    { hand = {-sortWith cardOrder <|-}
-        take 14 <| drop (offset * 14) cards
+    { hand = take 14 <| drop (offset * 14) cards
     , cardsOnHand = 14
     , collected = []
     , selection = []

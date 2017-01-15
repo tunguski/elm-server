@@ -181,11 +181,17 @@ handWithParsedCards table round player param =
             if param.isOpenDemand then
                 if param.hasDemandedCard then
                     if param.isDemandedCardInTrick then
-                        playCards
+                        if param.allowedTrick then
+                            playCards
+                        else
+                            response 400 "Trick does not match the one on table" |> Task.succeed
                     else
                         response 400 "You have to play demanded card" |> Task.succeed
                 else
-                    playCards
+                    if param.allowedTrick then
+                        playCards
+                    else
+                        response 400 "Trick does not match the one on table" |> Task.succeed
             else
                 -- play, switch to next player and return ok
                 playCards
@@ -239,6 +245,7 @@ hand api id =
                         , hasDemandedCard = openDemandMatch round
                         , parsedCards = cards
                         , trick = parseTrick cards
+                        , allowedTrick = allowedCombination (List.head round.table) cards
                         , isDemandedCardInTrick = cardInTrick round.demand cards
                         , isBomb = bomb (parseTrick cards)
                         , bombEnoughPower = True
