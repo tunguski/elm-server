@@ -1,5 +1,6 @@
 module TichuModel exposing (..)
 
+import Array
 import Time exposing (Time)
 import List exposing (..)
 import Maybe exposing (andThen)
@@ -421,16 +422,51 @@ removeCards cards hand =
     List.filter (\c -> not <| List.member c cards) hand
 
 
+switchCard card i players =
+    (Array.get (i % 4) players
+     |> (\pl ->
+         case pl of
+             Just player ->
+                Array.set (i % 4)
+                    { player | hand = card :: player.hand }
+                    players
+             Nothing ->
+                 players
+    ))
+
+
 {-| Exchange cards between players
 -}
 exchangeCardsBetweenPlayers table =
-    let
-        round = table.round
-    in
-        { table | round =
+    Array.fromList table.round.players
+    |> (\p ->
+        Array.indexedMap (,) p
+        |> Array.foldr (\(i, player) players ->
+            case player.exchange of
+                Just (a, b, c) ->
+                    switchCard c (i + 1) players
+                    |> switchCard a (i + 2)
+                    |> switchCard b (i + 3)
+                Nothing ->
+                    Debug.log "Cannot exchange if player did not declare cards" players
+        ) p
+    )
+    |> (\players ->
+        let
+            round = table.round
+        in
             { round
-            | players = round.players
+            | players = List.map (\player ->
+                    { player | hand =
+                        case player.exchange of
+                            Just (a, b, c) ->
+                                removeCards [a, b, c] player.hand
+                            Nothing ->
+                                Debug.log "Cannot remove if player did not declare cards" player.hand
+                    }
+                ) <| Array.toList players
             }
-        }
+    )
+    |> (\round -> { table | round = round })
 
 
