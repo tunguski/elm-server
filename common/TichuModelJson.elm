@@ -135,7 +135,7 @@ player =
     map8 Player
         (field "hand" <| cardsDecoder)
         (field "cardsOnHand" <| int)
-        (field "collected" <| cardsDecoder)
+        (field "collected" <| list (list cardsDecoder))
         (field "selection" <| cardsDecoder)
         (field "name" string)
         (field "score" int)
@@ -255,7 +255,7 @@ playerEncoder player =
     JE.object
         [ ( "hand", listToValue cardEncoder player.hand )
         , ( "cardsOnHand", JE.int player.cardsOnHand )
-        , ( "collected", listToValue cardEncoder player.collected )
+        , ( "collected", listToValue (listToValue (listToValue cardEncoder)) player.collected )
         , ( "selection", listToValue cardEncoder player.selection )
         , ( "name", JE.string player.name )
         , ( "score", JE.int player.score )

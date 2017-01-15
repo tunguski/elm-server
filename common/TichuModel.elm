@@ -225,7 +225,7 @@ bomb combination =
 type alias Player =
     { hand : List Card
     , cardsOnHand : Int
-    , collected : List Card
+    , collected : List (List Cards)
     , selection : List Card
     , name : String
     , score : Int
@@ -454,7 +454,7 @@ putCardsOnTable cards round =
 
 nextRound table =
     { table
-    | round = initRound ((table.round.seed + 19) * 263) table.players
+    | round = initRound ((table.round.seed + 19) * 263) table.users
     , history = table.round :: table.history
     }
 
@@ -469,6 +469,36 @@ maybeEndRound table =
         else
             table
     )
+
+
+modifyNthPlayer i modifier round =
+    case List.drop i round.players |> List.head of
+        Just player ->
+            modifyPlayer player.name modifier round
+        Nothing ->
+            Debug.log ("Could not find nth player: " ++ toString i) round
+
+
+maybeCollectCards round =
+    case round.tableHandOwner of
+        Just owner ->
+            if owner == round.actualPlayer then
+                collectCards owner round
+            else
+                round
+        Nothing ->
+            round
+
+
+collectCards owner round =
+    { round
+    | tableHandOwner = Nothing
+    , table = []
+    }
+    |> modifyNthPlayer owner
+        (\player -> { player
+            | collected = round.table :: player.collected
+        })
 
 
 {-| Exchange cards between players
