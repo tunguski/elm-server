@@ -73,6 +73,25 @@ executeIfNoError exec maybe =
             exec
 
 
+modifyNthPlayer i modifier round =
+    case List.drop i round.players |> List.head of
+        Just player ->
+            modifyPlayer player.name modifier round
+        Nothing ->
+            Debug.log ("Could not find nth player: " ++ toString i) round
+
+
+collectCards owner round =
+    { round
+    | tableHandOwner = Nothing
+    , table = []
+    }
+    |> modifyNthPlayer owner
+        (\player -> { player
+            | collected = player.collected ++ (List.concatMap identity round.table)
+        })
+
+
 {-| Pass player's move
 
 1. Check is it actual player
@@ -89,9 +108,22 @@ pass api id =
         |> orElse ((getActualPlayer round).name == session.username) "Not an actual player"
         |> orElse (not <| openDemandMatch round) "You have demanded card"
         |> orElse (not <| hasCard MahJong player) "You have MahJong"
+        |> orElse (not <| ifNothing round.tableHandOwner) "You cannot pass if you won last table"
         |> executeIfNoError (
             -- switch to next player and return ok
-            put table.name { table | round = incActualPlayer round } games
+            put table.name { table | round =
+                incActualPlayer round
+                |> (\round ->
+                    case round.tableHandOwner of
+                        Just owner ->
+                            if owner == round.actualPlayer then
+                                collectCards owner round
+                            else
+                                round
+                        Nothing ->
+                            round
+                )
+            } games
             |> andThenReturn (statusResponse 200 |> Task.succeed)
         )
     )
@@ -158,15 +190,19 @@ exchangeCards api id =
 handWithParsedCards table round player param =
     let
         playCards =
-            put table.name { table |
+            put table.name ({ table |
                 round = incActualPlayer round
                     |> modifyPlayer player.name
                         (\player -> { player
                             | hand = removeCards param.parsedCards player.hand
                             , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
                         })
+                    |> putCardsOnTable param.parsedCards
+                    |> setTableHandOwnerAsActualPlayer round.actualPlayer
                     |> Debug.log "handWithParsedCards"
-            } games
+            }
+            |> maybeEndRound
+            ) games
             |> andThenReturn (statusResponse 200 |> Task.succeed)
     in
         if param.isActualPlayer then
@@ -185,7 +221,13 @@ handWithParsedCards table round player param =
             if param.isBomb then
                 if param.bombEnoughPower then
                     -- play, switch to next player and return ok
-                    put table.name { table | round = incActualPlayer round } games
+                    put table.name ({ table | round =
+                        incActualPlayer round
+                        |> setTableHandOwnerAsActualPlayer round.actualPlayer
+                        |> Debug.log "handWithParsedCards"
+                    }
+                    |> maybeEndRound
+                    ) games
                     |> andThenReturn (statusResponse 200 |> Task.succeed)
                 else
                     response 400 "Too weak bomb" |> Task.succeed

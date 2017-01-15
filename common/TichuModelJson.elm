@@ -24,10 +24,11 @@ gameDecoder =
 
 round : Decoder Round
 round =
-    Json.map6 Round
+    Json.map7 Round
         (field "players" <| list player)
         (field "table" <| list cardsDecoder)
         (field "actualPlayer" int)
+        (field "tableHandOwner" (maybe int))
         (field "demand" (maybe rank))
         (field "demandCompleted" bool)
         (field "seed" (succeed 0))
@@ -276,6 +277,13 @@ roundEncoder round =
         [ ( "players", listToValue playerEncoder round.players )
         , ( "table", listToValue (List.map cardEncoder >> JE.list) round.table )
         , ( "actualPlayer", JE.int round.actualPlayer )
+        , ( "tableHandOwner",
+            case round.tableHandOwner of
+                Just owner ->
+                    JE.int owner
+                Nothing ->
+                    JE.null
+          )
         , ( "demand",
             case round.demand of
                 Just rank ->

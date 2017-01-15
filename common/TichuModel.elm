@@ -242,6 +242,8 @@ type alias Round =
     -- hands on table
     , table : List Cards
     , actualPlayer : Int
+    -- the owner of actually highest trick on table
+    , tableHandOwner : Maybe Int
     , demand : Maybe Rank
     , demandCompleted : Bool
     , seed : Int
@@ -330,6 +332,7 @@ initRound seed users =
                 ) users
             , table = []
             , actualPlayer = 0
+            , tableHandOwner = Nothing
             , demand = Nothing
             , demandCompleted = False
             , seed = seed
@@ -416,6 +419,12 @@ getActualPlayer round =
 
 incActualPlayer round =
     { round | actualPlayer = (round.actualPlayer + 1) % 4 }
+    |> (\round ->
+        if List.isEmpty (getActualPlayer round).hand then
+            incActualPlayer round
+        else
+            round
+    )
 
 
 removeCards cards hand =
@@ -433,6 +442,33 @@ switchCard card i players =
              Nothing ->
                  players
     ))
+
+
+setTableHandOwnerAsActualPlayer owner round =
+    { round | tableHandOwner = Just <| Debug.log "tableHandOwner" owner }
+
+
+putCardsOnTable cards round =
+    { round | table = cards :: round.table }
+
+
+nextRound table =
+    { table
+    | round = initRound ((table.round.seed + 19) * 263) table.players
+    , history = table.round :: table.history
+    }
+
+
+maybeEndRound table =
+    table.round.players
+    |> List.filter (.hand >> List.isEmpty)
+    |> List.length
+    |> (\activePlayers ->
+        if (activePlayers == 1) then
+            nextRound table
+        else
+            table
+    )
 
 
 {-| Exchange cards between players
@@ -461,6 +497,7 @@ exchangeCardsBetweenPlayers table =
                         case player.exchange of
                             Just (a, b, c) ->
                                 removeCards [a, b, c] player.hand
+                                |> sortWith cardOrder
                             Nothing ->
                                 Debug.log "Cannot remove if player did not declare cards" player.hand
                     }
