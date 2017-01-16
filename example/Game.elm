@@ -162,36 +162,32 @@ exchangeCards api id =
 handWithParsedCards table round player param =
     let
         playCards =
-            put table.name ({ table |
-                round = incActualPlayer round
-                    |> modifyPlayer player.name
-                        (\player -> { player
-                            | hand = removeCards param.parsedCards player.hand
-                            , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
-                        })
-                    |> putCardsOnTable param.parsedCards
-                    |> setTableHandOwnerAsActualPlayer round.actualPlayer
-                    |> Debug.log "handWithParsedCards"
-            }
-            |> maybeEndRound
-            ) games
-            |> andThenReturn (statusResponse 200 |> Task.succeed)
+            if param.allowedTrick then
+                put table.name ({ table |
+                    round = incActualPlayer round
+                        |> modifyPlayer player.name
+                            (\player -> { player
+                                | hand = removeCards param.parsedCards player.hand
+                                , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
+                            })
+                        |> putCardsOnTable param.parsedCards
+                        |> setTableHandOwnerAsActualPlayer round.actualPlayer
+                }
+                |> maybeEndRound
+                ) games
+                |> andThenReturn (statusResponse 200 |> Task.succeed)
+            else
+                response 400 "Trick does not match the one on table" |> Task.succeed
     in
         if param.isActualPlayer then
             if param.isOpenDemand then
                 if param.hasDemandedCard then
                     if param.isDemandedCardInTrick then
-                        if param.allowedTrick then
-                            playCards
-                        else
-                            response 400 "Trick does not match the one on table" |> Task.succeed
+                        playCards
                     else
                         response 400 "You have to play demanded card" |> Task.succeed
                 else
-                    if param.allowedTrick then
-                        playCards
-                    else
-                        response 400 "Trick does not match the one on table" |> Task.succeed
+                    playCards
             else
                 -- play, switch to next player and return ok
                 playCards
@@ -202,7 +198,6 @@ handWithParsedCards table round player param =
                     put table.name ({ table | round =
                         incActualPlayer round
                         |> setTableHandOwnerAsActualPlayer round.actualPlayer
-                        |> Debug.log "handWithParsedCards"
                     }
                     |> maybeEndRound
                     ) games
@@ -229,12 +224,8 @@ hand api id =
             Ok cards ->
                 Nothing
                 |> orElse (List.all (flip hasCard <| player) cards) "Tried to play card you don't own"
-                |> orElse (List.all (\player ->
-                        case player.exchange of
-                            Just _ -> True
-                            Nothing -> False
-                    ) round.players
-                ) "You have to exchange cards first"
+                |> orElse (List.all (.exchange >> ifNothing >> not) round.players)
+                          "You have to exchange cards first"
                 |> executeIfNoError (
                     handWithParsedCards
                         table

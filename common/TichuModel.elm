@@ -231,9 +231,11 @@ four cards =
 
 
 
+{-| Is combination allowed to be placed on table. There may be previous trick on table.
+-}
 allowedCombination : Maybe Cards -> Cards -> Bool
 allowedCombination table combination =
-    case parseTrick combination of
+    (case parseTrick combination of
         Just trick ->
             case Maybe.andThen parseTrick table of
                 Just trickOnTable ->
@@ -242,6 +244,7 @@ allowedCombination table combination =
                     True
         Nothing ->
             False
+    ) |> Debug.log "allowedCombination"
 
 
 tryParse parser (combination, cards) =
