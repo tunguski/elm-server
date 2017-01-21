@@ -213,7 +213,28 @@ straight cards =
 -- and full houses (three of a kind & a pair).
 fullHouse : Cards -> Maybe Combination
 fullHouse cards =
-    Nothing
+    case cards of
+        a :: b :: c :: d :: e :: [] ->
+            case (three [a, b, c], pair [d, e]) of
+                (Just t, Just p) ->
+                    case t of
+                        Three r ->
+                            Just <| FullHouse r
+                        _ ->
+                            Nothing
+                _ ->
+                    case (pair [a, b], three [c, d, e]) of
+                        (Just p, Just t) ->
+                            case t of
+                                Three r ->
+                                    Just <| FullHouse r
+                                _ ->
+                                    Nothing
+                        _ ->
+                            Nothing
+
+        _ ->
+            Nothing
 
 
 -- Four of a kind or a straight flush of at least five cards is a bomb
