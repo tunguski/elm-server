@@ -573,6 +573,21 @@ nextRound table =
     }
 
 
+playHandAndUpdateRound table round player param =
+    { table |
+        round = incActualPlayer round
+            |> modifyPlayer player.name
+                (\player -> { player
+                    | hand = removeCards param.parsedCards player.hand
+                    , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
+                })
+            |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
+            |> putCardsOnTable param.parsedCards
+            |> setTableHandOwnerAsActualPlayer round.actualPlayer
+    }
+    |> maybeEndRound
+
+
 maybeEndRound table =
     table.round.players
     |> List.filter (.hand >> List.isEmpty >> not)

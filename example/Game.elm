@@ -163,19 +163,9 @@ handWithParsedCards table round player param =
     let
         playCards =
             if param.allowedTrick then
-                put table.name ({ table |
-                    round = incActualPlayer round
-                        |> modifyPlayer player.name
-                            (\player -> { player
-                                | hand = removeCards param.parsedCards player.hand
-                                , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
-                            })
-                        |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
-                        |> putCardsOnTable param.parsedCards
-                        |> setTableHandOwnerAsActualPlayer round.actualPlayer
-                }
-                |> maybeEndRound
-                ) games
+                put table.name
+                    (playHandAndUpdateRound table round player param)
+                    games
                 |> andThenReturn (statusResponse 200 |> Task.succeed)
             else
                 response 400 "Trick does not match the one on table" |> Task.succeed
@@ -196,13 +186,9 @@ handWithParsedCards table round player param =
             if param.isBomb then
                 if param.bombEnoughPower then
                     -- play, switch to next player and return ok
-                    put table.name ({ table | round =
-                        incActualPlayer round
-                        |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
-                        |> setTableHandOwnerAsActualPlayer round.actualPlayer
-                    }
-                    |> maybeEndRound
-                    ) games
+                    put table.name
+                        (playHandAndUpdateRound table round player param)
+                        games
                     |> andThenReturn (statusResponse 200 |> Task.succeed)
                 else
                     response 400 "Too weak bomb" |> Task.succeed
