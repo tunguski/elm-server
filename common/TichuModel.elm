@@ -127,6 +127,9 @@ highCard combination =
 pair : Cards -> Maybe Combination
 pair combination =
     case combination of
+        [ NormalCard a b, Phoenix ] ->
+            Just (Pair b)
+
         [ NormalCard a b, NormalCard c d ] ->
             if rankWeight b == rankWeight d then
                 Just (Pair b)
@@ -146,48 +149,46 @@ pairStairs combination =
     Maybe.map (\( r, i ) -> PairStairs r i) (extractPairStairs combination)
 
 
-nextPairPower : ( Rank, Int ) -> Card -> ( Rank, Int )
-nextPairPower ( r, i ) card =
-    case card of
-        NormalCard s r ->
-            ( r, i + 1 )
+nextPairPower : ( Rank, Int ) -> Rank -> Maybe ( Rank, Int )
+nextPairPower ( r, i ) rank =
+    if rankWeight rank + 1 == rankWeight r then
+        Just (rank, i + 1)
+    else
+        Nothing
 
+
+calculatePairStairsPower : Card -> Card -> Maybe Rank
+calculatePairStairsPower a b =
+    case pair [ a, b ] of
+        Just (Pair rank) ->
+            Just rank
         _ ->
-            ( r, i )
-
-
-calculatePairStraitPower : Card -> Card -> Maybe Card
-calculatePairStraitPower a b =
-    ((pair [ a, b ])
-    |> andThen (\combination ->
-        case combination of
-            Pair rank ->
-                case a of
-                    NormalCard s r ->
-                        if ((rankWeight r) == 0 || (rankWeight r) == (rankWeight rank) + 1) then
-                            Just a
-                        else
-                            Nothing
-
-                    _ ->
-                        Nothing
-
-            _ ->
-                Nothing
-        )
-    )
+            Nothing
 
 
 extractPairStairs : Cards -> Maybe ( Rank, Int )
 extractPairStairs combination =
-    case combination of
+    (case Debug.log "combination" combination of
+        a :: b :: [] ->
+            case calculatePairStairsPower a b of
+                Just rank ->
+                    Just (rank, 1)
+                _ ->
+                    Nothing
         a :: b :: tail ->
             Maybe.map2 nextPairPower
                 (extractPairStairs tail)
-                (calculatePairStraitPower a b)
+                (calculatePairStairsPower a b)
+            |> (\m -> case m of
+                    Just (Just v) ->
+                        Just v
+                    _ ->
+                        Nothing
+                )
 
         _ ->
             Nothing
+    ) |> Debug.log "extracted"
 
 
 
@@ -195,11 +196,18 @@ extractPairStairs combination =
 three : Cards -> Maybe Combination
 three cards =
     case cards of
+        [ NormalCard s1 r1, NormalCard s2 r2, Phoenix ] ->
+            if r1 == r2 then
+                Just (Three r1)
+            else
+                Nothing
+
         [ NormalCard s1 r1, NormalCard s2 r2, NormalCard s3 r3 ] ->
             if r1 == r2 && r2 == r3 then
                 Just (Three r1)
             else
                 Nothing
+
         _ ->
             Nothing
 
@@ -339,6 +347,7 @@ type alias Round =
     , demand : Maybe Rank
     , demandCompleted : Bool
     , seed : Int
+    , winner : Maybe Int
     }
 
 
@@ -428,6 +437,7 @@ initRound seed users =
             , demand = Nothing
             , demandCompleted = False
             , seed = seed
+            , winner = Nothing
             }
     -- set actual player by seeking MahJong
     |> (\round ->
@@ -518,6 +528,19 @@ incActualPlayer round =
     )
 
 
+maybeSetWinner hand actualPlayer round =
+    case Debug.log "hand" hand of
+        [] ->
+            case round.winner of
+                Just _ ->
+                    round
+                Nothing ->
+                    { round | winner = Just actualPlayer }
+        _ ->
+            round
+
+
+
 removeCards cards hand =
     List.filter (\c -> not <| List.member c cards) hand
 
@@ -552,7 +575,7 @@ nextRound table =
 
 maybeEndRound table =
     table.round.players
-    |> List.filter (.hand >> List.isEmpty)
+    |> List.filter (.hand >> List.isEmpty >> not)
     |> List.length
     |> (\activePlayers ->
         if (activePlayers == 1) then

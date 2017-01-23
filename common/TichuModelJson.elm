@@ -24,7 +24,7 @@ gameDecoder =
 
 round : Decoder Round
 round =
-    Json.map7 Round
+    Json.map8 Round
         (field "players" <| list player)
         (field "table" <| list cardsDecoder)
         (field "actualPlayer" int)
@@ -32,6 +32,7 @@ round =
         (field "demand" (maybe rank))
         (field "demandCompleted" bool)
         (field "seed" (succeed 0))
+        (field "winner" (maybe int))
 
 
 gameUser : Decoder GameUser
@@ -271,28 +272,25 @@ playerEncoder player =
         ]
 
 
+maybeEncoder maybe encoder =
+    case maybe of
+        Just value ->
+            encoder value
+        Nothing ->
+            JE.null
+
+
 roundEncoder : Round -> Value
 roundEncoder round =
     JE.object
         [ ( "players", listToValue playerEncoder round.players )
         , ( "table", listToValue (List.map cardEncoder >> JE.list) round.table )
         , ( "actualPlayer", JE.int round.actualPlayer )
-        , ( "tableHandOwner",
-            case round.tableHandOwner of
-                Just owner ->
-                    JE.int owner
-                Nothing ->
-                    JE.null
-          )
-        , ( "demand",
-            case round.demand of
-                Just rank ->
-                    rankEncoder rank
-                Nothing ->
-                    JE.null
-          )
+        , ( "tableHandOwner", maybeEncoder round.tableHandOwner JE.int )
+        , ( "demand", maybeEncoder round.demand rankEncoder )
         , ( "demandCompleted", JE.bool round.demandCompleted )
         , ( "seed", JE.int round.seed )
+        , ( "winner", maybeEncoder round.winner JE.int )
         ]
 
 

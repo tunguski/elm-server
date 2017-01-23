@@ -170,6 +170,7 @@ handWithParsedCards table round player param =
                                 | hand = removeCards param.parsedCards player.hand
                                 , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
                             })
+                        |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
                         |> putCardsOnTable param.parsedCards
                         |> setTableHandOwnerAsActualPlayer round.actualPlayer
                 }
@@ -197,6 +198,7 @@ handWithParsedCards table round player param =
                     -- play, switch to next player and return ok
                     put table.name ({ table | round =
                         incActualPlayer round
+                        |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
                         |> setTableHandOwnerAsActualPlayer round.actualPlayer
                     }
                     |> maybeEndRound
