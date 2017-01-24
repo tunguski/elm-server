@@ -92,10 +92,9 @@ pass api id =
         |> orElse (not <| ifNothing round.tableHandOwner) "You cannot pass if you won last table"
         |> executeIfNoError (
             -- switch to next player and return ok
-            put table.name { table | round =
-                incActualPlayer round
-                |> maybeCollectCards
-            } games
+            put table.name
+                { table | round = incActualPlayer round }
+                games
             |> andThenReturn (statusResponse 200 |> Task.succeed)
         )
     )

@@ -518,8 +518,9 @@ getActualPlayer round =
     |> defaultCrash ("Malformed state getActualPlayer: " ++ toString round)
 
 
-incActualPlayer round =
-    { round | actualPlayer = (round.actualPlayer + 1) % 4 }
+incActualPlayer r =
+    { r | actualPlayer = (r.actualPlayer + 1) % 4 }
+    |> maybeCollectCards
     |> (\round ->
         if List.isEmpty (getActualPlayer round).hand then
             incActualPlayer round
@@ -574,17 +575,49 @@ nextRound table =
 
 
 playHandAndUpdateRound table round player param =
-    { table |
-        round = incActualPlayer round
-            |> modifyPlayer player.name
-                (\player -> { player
-                    | hand = removeCards param.parsedCards player.hand
-                    , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
-                })
-            |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
-            |> putCardsOnTable param.parsedCards
-            |> setTableHandOwnerAsActualPlayer round.actualPlayer
-    }
+    case param.parsedCards of
+        Dog :: [] ->
+            { table |
+                round =
+                    { round | actualPlayer = (round.actualPlayer + 2) % 4 }
+                    |> (\round ->
+                        case (getActualPlayer round).hand of
+                            [] -> incActualPlayer round
+                            _ -> round
+                    )
+                    |> modifyPlayer player.name
+                        (\player -> { player
+                            | hand = removeCards param.parsedCards player.hand
+                            , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
+                        })
+                    |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
+                    |> (\round ->
+                        let
+                            player = getActualPlayer round
+                        in
+                            modifyPlayer
+                                player.name
+                                (\player -> { player
+                                    | collected = [ [ [ Dog ] ] ] ++ player.collected
+                                })
+                                round
+                    )
+                    -- putCardsOnTable param.parsedCards
+                    |> setTableHandOwnerAsActualPlayer round.actualPlayer
+            }
+        _ ->
+            { table |
+                round =
+                    incActualPlayer round
+                    |> modifyPlayer player.name
+                        (\player -> { player
+                            | hand = removeCards param.parsedCards player.hand
+                            , cardsOnHand = List.length (removeCards param.parsedCards player.hand)
+                        })
+                    |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
+                    |> putCardsOnTable param.parsedCards
+                    |> setTableHandOwnerAsActualPlayer round.actualPlayer
+            }
     |> maybeEndRound
 
 
