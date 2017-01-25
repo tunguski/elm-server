@@ -197,7 +197,7 @@ getIdSession : Request -> Maybe String
 getIdSession request =
     case getHeader x_test_session request of
         Just id ->
-            Just (Debug.log x_test_session id)
+            Just id
         Nothing ->
             Dict.get "SESSIONID" <| getCookies request
 

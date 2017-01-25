@@ -100,7 +100,7 @@ performBatch tasks =
         |> Command
 
 
-initDb : () -> Partial Msg 
+initDb : () -> Partial Msg
 initDb _ =
    performBatch
         (List.map createCollection requiredTables)
@@ -141,7 +141,7 @@ init request =
 
 update : Updater Msg -- Request -> Msg -> Partial Msg
 update request msg =
-    case Debug.log "update msg" msg of
+    case msg of
         SendResponse response ->
             Result response
 

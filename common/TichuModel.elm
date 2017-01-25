@@ -168,7 +168,7 @@ calculatePairStairsPower a b =
 
 extractPairStairs : Cards -> Maybe ( Rank, Int )
 extractPairStairs combination =
-    (case Debug.log "combination" combination of
+    (case combination of
         a :: b :: [] ->
             case calculatePairStairsPower a b of
                 Just rank ->
@@ -188,8 +188,7 @@ extractPairStairs combination =
 
         _ ->
             Nothing
-    ) |> Debug.log "extracted"
-
+    )
 
 
 -- three of a kind;
@@ -530,7 +529,7 @@ incActualPlayer r =
 
 
 maybeSetWinner hand actualPlayer round =
-    case Debug.log "hand" hand of
+    case hand of
         [] ->
             case round.winner of
                 Just _ ->
@@ -560,7 +559,7 @@ switchCard card i players =
 
 
 setTableHandOwnerAsActualPlayer owner round =
-    { round | tableHandOwner = Just <| Debug.log "tableHandOwner" owner }
+    { round | tableHandOwner = Just owner }
 
 
 putCardsOnTable cards round =
@@ -659,7 +658,7 @@ collectCards owner round =
     }
     |> modifyNthPlayer owner
         (\player -> { player
-            | collected = round.table :: player.collected
+            | collected = Debug.log "collected" <| round.table :: player.collected
         })
 
 
