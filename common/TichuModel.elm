@@ -509,6 +509,22 @@ modifyPlayer name function round =
     }
 
 
+maybeModifyPlayer index function round =
+    case index of
+        Just i ->
+            List.drop i round.players
+            |> List.head
+            |> (\player ->
+                case player of
+                    Just p ->
+                        modifyPlayer p.name function round
+                    _ ->
+                        round
+            )
+        _ ->
+            round
+
+
 getActualPlayer : Round -> Player
 getActualPlayer round =
     round.players
@@ -595,10 +611,28 @@ putCardsOnTable cards round =
     { round | table = cards :: round.table }
 
 
+giveLoosersCards : Round -> Round
+giveLoosersCards round =
+    round.players
+    |> List.indexedMap (,)
+    |> List.filter (Tuple.second >> .hand >> List.isEmpty >> not)
+    |> List.head
+    |> Maybe.map (\(i, looser) ->
+        round
+        |> maybeModifyPlayer round.winner
+            (\player -> { player | collected = looser.collected ++ player.collected })
+        |> maybeModifyPlayer (Just i)
+            (\player -> { player | collected = [] })
+        |> maybeModifyPlayer (Just ((i + 1) % 4))
+            (\player -> { player | collected = [ looser.hand ] :: player.collected })
+    )
+    |> Maybe.withDefault round
+
+
 nextRound table =
     { table
     | round = initRound ((table.round.seed + 19) * 263) table.users
-    , history = table.round :: table.history
+    , history = (giveLoosersCards table.round) :: table.history
     }
 
 
@@ -723,5 +757,25 @@ exchangeCardsBetweenPlayers table =
             }
     )
     |> (\round -> { table | round = round })
+
+
+calculatePlayersPoints : Round -> List Int
+calculatePlayersPoints round =
+    round.players
+    |> List.map (\player ->
+        player.collected
+        |> List.concatMap identity
+        |> List.concatMap identity
+        |> List.map (\card ->
+               case card of
+                   Dragon -> 25
+                   Phoenix -> -25
+                   NormalCard _ K -> 10
+                   NormalCard _ (R 10) -> 10
+                   NormalCard _ (R 5) -> 5
+                   _ -> 0
+            )
+        |> List.sum
+    )
 
 
