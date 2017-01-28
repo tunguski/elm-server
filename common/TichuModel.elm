@@ -443,9 +443,7 @@ initRound seed users =
         { round | actualPlayer =
             List.indexedMap (,) round.players
             |> List.foldl (\(i, user) before ->
-                case hasCard MahJong user of
-                    True -> Just i
-                    False -> before
+                choose (hasCard MahJong user) (Just i) before
             ) Nothing
             |> Maybe.withDefault 0
         }
@@ -502,9 +500,7 @@ getPlayer round name =
 modifyPlayer name function round =
     { round | players =
         List.map (\player ->
-            case player.name == name of
-                True -> function player
-                False -> player
+            choose (player.name == name) (function player) player
         ) round.players
     }
 
@@ -718,9 +714,7 @@ collectCards owner round =
     , table = []
     }
     |> modifyNthPlayer owner
-        (\player -> { player
-            | collected = Debug.log "collected" <| round.table :: player.collected
-        })
+        (\player -> { player | collected = round.table :: player.collected })
 
 
 {-| Exchange cards between players
@@ -759,6 +753,10 @@ exchangeCardsBetweenPlayers table =
     |> (\round -> { table | round = round })
 
 
+choose condition true false =
+    if condition then true else false
+
+
 calculatePlayersPoints : Round -> List Int
 calculatePlayersPoints round =
     round.players
@@ -767,15 +765,33 @@ calculatePlayersPoints round =
         |> List.concatMap identity
         |> List.concatMap identity
         |> List.map (\card ->
-               case card of
-                   Dragon -> 25
-                   Phoenix -> -25
-                   NormalCard _ K -> 10
-                   NormalCard _ (R 10) -> 10
-                   NormalCard _ (R 5) -> 5
-                   _ -> 0
-            )
+           case card of
+               Dragon -> 25
+               Phoenix -> -25
+               NormalCard _ K -> 10
+               NormalCard _ (R 10) -> 10
+               NormalCard _ (R 5) -> 5
+               _ -> 0
+        )
         |> List.sum
+        |> (\pointsFromCards ->
+            if player.tichu || player.grandTichu then
+                round.winner
+                |> Maybe.andThen (\winner ->
+                    List.drop winner round.players
+                    |> List.head
+                )
+                |> Maybe.map (\winner ->
+                    let
+                        addon = choose player.tichu 100 200
+                        won = choose (winner.name == player.name) identity negate
+                    in
+                        won addon + pointsFromCards
+                )
+                |> Maybe.withDefault pointsFromCards
+            else
+                pointsFromCards
+        )
     )
 
 
