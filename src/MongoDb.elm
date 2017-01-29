@@ -74,7 +74,7 @@ listDocuments rest =
     case config rest of
         conf ->
             HttpBuilder.get (conf.baseUrl ++ conf.collectionName)
-            |> withExpect (Http.expectJson (collectionDecoder 
+            |> withExpect (Http.expectJson (collectionDecoder
                 (oneOf
                     [ conf.decoder |> map Just
                     , succeed Nothing
@@ -83,6 +83,10 @@ listDocuments rest =
             ))
             |> toTask
             |> Task.map (\coll -> { coll | elements = List.filterMap identity coll.elements })
+
+
+filterCollection filter collection =
+    { collection | elements = List.filter filter collection.elements }
 
 
 type alias MongoDb =

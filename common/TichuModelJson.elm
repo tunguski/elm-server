@@ -12,8 +12,9 @@ import Tuple
 
 gameDecoder : Decoder Game
 gameDecoder =
-    Json.map7 Game
+    Json.map8 Game
         (field "name" string)
+        (field "test" bool)
         (field "seed" (succeed 0))
         (field "users" <| list gameUser)
         (field "round" round)
@@ -196,6 +197,7 @@ gameEncoder : Game -> Value
 gameEncoder game =
     JE.object
         [ ( "name", JE.string game.name )
+        , ( "test", JE.bool game.test )
         , ( "seed", JE.int game.seed )
         , ( "users"
           , JE.list (List.map gameUserEncoder game.users)

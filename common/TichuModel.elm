@@ -400,6 +400,7 @@ type alias GameUser =
 
 type alias Game =
     { name : String
+    , test : Bool
     , seed : Int
     , users : List GameUser
     , round : Round
@@ -429,8 +430,8 @@ type UpdateGame
     | UpdateRound (Round -> Round)
 
 
-initGame : String -> Int -> List AwaitingTableUser -> Game
-initGame name seed users =
+initGame : String -> Bool -> Int -> List AwaitingTableUser -> Game
+initGame name test seed users =
     let
         gameUsers =
             List.map (\user ->
@@ -438,6 +439,7 @@ initGame name seed users =
             ) users
     in
         { name = name
+        , test = test
         , seed = seed
         , users = gameUsers
         , round = initRound seed gameUsers

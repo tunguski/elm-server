@@ -98,8 +98,8 @@ createGame table r =
     then
         case List.map (\user -> get user.name users) table.users of
             a :: b :: c :: d :: [] ->
-                put table.name 
-                    (initGame table.name table.seed table.users)
+                put table.name
+                    (initGame table.name table.test table.seed table.users)
                     games
                 |> andThenReturn (succeed r)
             _ ->
@@ -126,8 +126,8 @@ joinAwaitingTable api id =
                     True ->
                         statusResponse 204 |> Task.succeed
                     False ->
-                        put id { table | users = 
-                            (table.users 
+                        put id { table | users =
+                            (table.users
                              ++
                              [ AwaitingTableUser session.username api.request.time False ] )
                         } awaitingTables
@@ -204,9 +204,8 @@ userCheckTooOld api =
 listAwaitingTables api =
     listDocuments awaitingTables
         |> andThen
-            (.elements >>
-             List.filter (\table -> table.test == api.request.test) >>
-             (\tables ->
+            (.elements
+             >> (\tables ->
                 let
                     toUpdate =
                         List.filter
@@ -237,6 +236,12 @@ listAwaitingTables api =
                         |> andThen
                             (\r ->
                                 listDocuments awaitingTables
+                                |> andThen (\tables ->
+                                    succeed { tables
+                                        -- filter test elements - we dont want to show it to players
+                                        | elements = List.filter (.test >> (==) api.request.test) tables.elements
+                                    }
+                                )
                             )
             ))
         |> Task.attempt

@@ -52,7 +52,7 @@ tablesApiPart api =
                             |> onError (\error ->
                                 let
                                     table =
-                                        initGame "test" 0 []
+                                        initGame "test" api.request.test 0 []
                                 in
                                     put api.request.body table games
                                     |> andThenReturn (Task.succeed table)
@@ -63,18 +63,15 @@ tablesApiPart api =
                         )
 
                     Get ->
-                        listDocuments games
-                            |> Task.attempt (\result ->
-                                case result of
-                                    Ok tables ->
-                                        api.sendResponse
-                                            (okResponse
-                                                (encodeCollection gameEncoder tables)
-                                            )
-                                    Err error ->
-                                      (error |> toString >> response 500 >> api.sendResponse)
+                        api.doWithSession (\session ->
+                            listDocuments games
+                            |> andThen (
+                                encodeCollection gameEncoder
+                                >> okResponse
+                                >> Task.succeed
                             )
-                            |> Command
+                            |> onError (toString >> response 500 >> Task.succeed)
+                        )
 
                     _ ->
                         statusResponse 405
