@@ -41,6 +41,7 @@ gamesApiPart api =
             , PF "declareGrandTichu" (\() -> declareGrandTichu api id)
             , PF "pass" (\() -> pass api id)
             , PF "hand" (\() -> hand api id)
+            , PF "giveDragon" (\() -> giveDragon api id)
             ]
           )
         ]
@@ -344,5 +345,38 @@ getGame api id =
                 )
             |> onError logErrorAndReturn
         )
+
+
+giveDragon : ApiPartApi msg -> String -> Partial msg
+giveDragon api id =
+    doWithTable api id (\session table round player ->
+        Nothing
+        |> orElse (
+            case round.tableHandOwner of
+                Just owner ->
+                    owner == round.actualPlayer
+                    && (getNthPlayer round owner).name == session.username
+                _ ->
+                    False
+        ) "Not an actual player or not owner of Dragon"
+        |> orElse (case List.head round.table of
+            Just (Dragon :: []) -> True
+            _ -> False
+        ) "There is no Dragon on top of table"
+        |> executeIfNoError (
+            let
+                index =
+                    if (api.request.body == "next") then
+                        (round.actualPlayer + 1) % 4
+                    else
+                        (round.actualPlayer + 3) % 4
+            in
+                -- switch to next player and return ok
+                put table.name
+                    { table | round = giveDragonTo index round }
+                    games
+                |> andThenReturn (statusResponse 200 |> Task.succeed)
+        )
+    )
 
 

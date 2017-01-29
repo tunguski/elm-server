@@ -88,7 +88,7 @@ type
       -- three's rank
     | FullHouse Rank
       -- lowest, length
-    | Straight Rank Int
+    | Straight Int Int
     | Three Rank
       -- lowest, length
     | PairStairs Rank Int
@@ -106,7 +106,7 @@ isSameTrickAndStronger c1 c2 =
         (Pair r1, Pair r2) -> rankWeight r1 > rankWeight r2
         (PairStairs b1 i1, PairStairs b2 i2) -> i1 == i2 && rankWeight b1 > rankWeight b2
         (Three r1, Three r2) -> rankWeight r1 > rankWeight r2
-        (Straight r1 i1, Straight r2 i2) -> i1 == i2 && rankWeight r1 > rankWeight r2
+        (Straight r1 i1, Straight r2 i2) -> i1 == i2 && r1 > r2
         (FullHouse r1, FullHouse r2) -> rankWeight r1 > rankWeight r2
         _ -> False
 
@@ -214,7 +214,36 @@ three cards =
 -- straights of at least five cards in length, regardless of suit/color (so 56789TJQ is playable);
 straight : Cards -> Maybe Combination
 straight cards =
-    Nothing
+    let
+        parseStraight length last next =
+            case next of
+                (NormalCard _ r) :: t ->
+                    case rankWeight r == last + 1 of
+                        True -> parseStraight (length + 1) (last + 1) t
+                        False -> Nothing
+                Phoenix :: t ->
+                    -- MahJong after Ace does not count
+                    case last < 14 of
+                        True -> parseStraight (length + 1) (last + 1) t
+                        False -> Nothing
+                [] ->
+                    case length >= 5 of
+                        True -> Just (Straight last length)
+                        False -> Nothing
+                _ ->
+                    Nothing
+
+    in
+        case cards of
+            (NormalCard _ r) :: t ->
+                parseStraight 1 (rankWeight r) t
+            MahJong :: t ->
+                parseStraight 1 1 t
+            Phoenix :: (NormalCard _ r) :: t ->
+                parseStraight 2 (rankWeight r) t
+            _ ->
+                Nothing
+
 
 
 -- and full houses (three of a kind & a pair).
@@ -538,17 +567,6 @@ getActualPlayer round =
 nextPlayerNumber i = (i + 1) % 4
 
 
-incActualPlayer r =
-    { r | actualPlayer = nextPlayerNumber r.actualPlayer }
-    |> maybeCollectCards
-    |> (\round ->
-        if List.isEmpty (getActualPlayer round).hand then
-            incActualPlayer round
-        else
-            round
-    )
-
-
 playerIndex players player =
     let
         getPlayerIndex i players player =
@@ -706,18 +724,50 @@ modifyNthPlayer i modifier round =
             Debug.log ("Could not find nth player: " ++ toString i) round
 
 
+{-| Increment actual player
+
+1. Add one to actulaPlayer index (cyclic modulo 4).
+2. If actualPlayer == owner of hand
+    - if Dragon is on top, do nothing more
+    - if not, collect cards and if player has no more cards
+      increment once again
+
+-}
+incActualPlayer r =
+    { r | actualPlayer = nextPlayerNumber r.actualPlayer }
+    |> maybeCollectCards
+    |> (\(stop, round) ->
+        if not stop && (List.isEmpty (getActualPlayer round).hand) then
+            incActualPlayer round
+        else
+            round
+    )
+
+
 maybeCollectCards round =
     case round.tableHandOwner of
         Just owner ->
             if owner == round.actualPlayer then
                 collectCards round
             else
-                round
+                (False, round)
         Nothing ->
-            round
+            (False, round)
 
 
-collectCards : Round -> Round
+giveDragonTo index round =
+    { round
+    | tableHandOwner = Nothing
+    , table = []
+    }
+    |> (\r ->
+        modifyNthPlayer index
+            (\player -> { player | collected = round.table :: player.collected })
+            r
+    )
+
+
+collectCards : Round -> (Bool, Round)
 collectCards round =
     { round
     | tableHandOwner = Nothing
@@ -727,17 +777,20 @@ collectCards round =
         case List.head round.table of
             Just (Dragon :: []) ->
                 if List.isEmpty (getNthPlayer round (round.actualPlayer + 1)).hand then
+                    (,) False <|
                     modifyNthPlayer ((round.actualPlayer + 3) % 4)
                         (\player -> { player | collected = round.table :: player.collected })
                         r
                 else if List.isEmpty (getNthPlayer round (round.actualPlayer + 3)).hand then
+                    (,) False <|
                     modifyNthPlayer ((round.actualPlayer + 1) % 4)
                         (\player -> { player | collected = round.table :: player.collected })
                         r
                 else
                     -- player has to decide who gets the dragon
-                    round
+                    (True, round)
             _ ->
+                (,) False <|
                 modifyNthPlayer round.actualPlayer
                     (\player -> { player | collected = round.table :: player.collected })
                     r
