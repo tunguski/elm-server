@@ -491,6 +491,12 @@ defaultCrash text item =
         Nothing -> Debug.crash text
 
 
+getNthPlayer round index =
+    List.drop (index % 4) round.players
+    |> List.head
+    |> defaultCrash ("Malformed state getNthPlayer: " ++ (toString index) ++ ": " ++ toString round)
+
+
 getPlayer round name =
     List.filter (.name >> (==) name) round.players
     |> List.head
@@ -529,8 +535,11 @@ getActualPlayer round =
     |> defaultCrash ("Malformed state getActualPlayer: " ++ toString round)
 
 
+nextPlayerNumber i = (i + 1) % 4
+
+
 incActualPlayer r =
-    { r | actualPlayer = (r.actualPlayer + 1) % 4 }
+    { r | actualPlayer = nextPlayerNumber r.actualPlayer }
     |> maybeCollectCards
     |> (\round ->
         if List.isEmpty (getActualPlayer round).hand then
@@ -555,7 +564,7 @@ playerIndex players player =
 
 setActualPlayer player round =
     case playerIndex round.players player of
-        Just i -> { round | actualPlayer = (i + 1) % 4 }
+        Just i -> { round | actualPlayer = nextPlayerNumber i }
         Nothing -> round
 
 
@@ -619,7 +628,7 @@ giveLoosersCards round =
             (\player -> { player | collected = looser.collected ++ player.collected })
         |> maybeModifyPlayer (Just i)
             (\player -> { player | collected = [] })
-        |> maybeModifyPlayer (Just ((i + 1) % 4))
+        |> maybeModifyPlayer (Just (nextPlayerNumber i))
             (\player -> { player | collected = [ looser.hand ] :: player.collected })
     )
     |> Maybe.withDefault round
@@ -701,20 +710,38 @@ maybeCollectCards round =
     case round.tableHandOwner of
         Just owner ->
             if owner == round.actualPlayer then
-                collectCards owner round
+                collectCards round
             else
                 round
         Nothing ->
             round
 
 
-collectCards owner round =
+collectCards : Round -> Round
+collectCards round =
     { round
     | tableHandOwner = Nothing
     , table = []
     }
-    |> modifyNthPlayer owner
-        (\player -> { player | collected = round.table :: player.collected })
+    |> (\r ->
+        case List.head round.table of
+            Just (Dragon :: []) ->
+                if List.isEmpty (getNthPlayer round (round.actualPlayer + 1)).hand then
+                    modifyNthPlayer ((round.actualPlayer + 3) % 4)
+                        (\player -> { player | collected = round.table :: player.collected })
+                        r
+                else if List.isEmpty (getNthPlayer round (round.actualPlayer + 3)).hand then
+                    modifyNthPlayer ((round.actualPlayer + 1) % 4)
+                        (\player -> { player | collected = round.table :: player.collected })
+                        r
+                else
+                    -- player has to decide who gets the dragon
+                    round
+            _ ->
+                modifyNthPlayer round.actualPlayer
+                    (\player -> { player | collected = round.table :: player.collected })
+                    r
+    )
 
 
 {-| Exchange cards between players
