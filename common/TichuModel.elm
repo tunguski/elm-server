@@ -410,6 +410,17 @@ type alias Game =
     }
 
 
+type GameType
+    = Humans
+    | HumansVsBots
+    | Bots
+
+
+type alias GameConfig =
+    { gameType : GameType
+    }
+
+
 type alias AwaitingTableUser =
     { name : String
     , lastCheck : Time

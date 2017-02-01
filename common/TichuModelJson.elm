@@ -10,6 +10,27 @@ import TichuModel exposing (..)
 import Tuple
 
 
+gameConfigDecoder : Decoder GameConfig
+gameConfigDecoder =
+    Json.map GameConfig
+        ((field "gameType" string)
+            |> andThen
+                (\string ->
+                    case string of
+                        "Humans" ->
+                            succeed Humans
+
+                        "HumansVsBots" ->
+                            succeed HumansVsBots
+
+                        "Bots" ->
+                            succeed Bots
+
+                        _ ->
+                            fail "Unknown game type"
+                )
+        )
+
 gameDecoder : Decoder Game
 gameDecoder =
     Json.map8 Game
@@ -207,6 +228,17 @@ gameEncoder game =
         , ( "messages", JE.list (List.map messageEncoder game.messages) )
         , ( "log", JE.list [] )
         ]
+
+
+gameConfigEncoder : GameConfig -> Value
+gameConfigEncoder config =
+    JE.object
+        [ ( "gameType", JE.string <| toString config.gameType )
+        ]
+
+
+encodeGameConfig config =
+    JE.encode 0 <| gameConfigEncoder config
 
 
 gameUserEncoder : GameUser -> Value
