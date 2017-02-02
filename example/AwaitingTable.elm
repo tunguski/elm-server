@@ -175,7 +175,18 @@ postAwaitingTable api id =
                             table =
                                 AwaitingTable id
                                     gameConfig
-                                    [ AwaitingTableUser session.username api.request.time False True ]
+                                    ([ AwaitingTableUser session.username api.request.time False True ]
+                                     ++
+                                       case gameConfig.gameType of
+                                            Humans ->
+                                                []
+                                            _ ->
+                                                [ AwaitingTableUser "bot 1" api.request.time False False
+                                                , AwaitingTableUser "bot 2" api.request.time False False
+                                                , AwaitingTableUser "bot 3" api.request.time False False
+                                                ]
+
+                                    )
                                     api.request.test
                                     (if api.request.test then
                                         getHeaderDefault "X-Test-Game-Seed"
