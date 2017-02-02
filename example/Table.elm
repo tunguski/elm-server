@@ -45,23 +45,6 @@ tablesApiPart api =
         , F
             (\() ->
                 case api.request.method of
-                    Post ->
-                        api.doWithSession (\session ->
-                            (get api.request.body games)
-                            -- create new table only if table was not found in db
-                            |> onError (\error ->
-                                let
-                                    table =
-                                        initGame "test" api.request.test 0 []
-                                in
-                                    put api.request.body table games
-                                    |> andThenReturn (Task.succeed table)
-                            )
-                            -- if table exists, return error information that name is reserved
-                            -- return created table
-                            |> andThen (encode gameEncoder >> okResponse >> Task.succeed)
-                        )
-
                     Get ->
                         api.doWithSession (\session ->
                             listDocuments games
@@ -74,8 +57,7 @@ tablesApiPart api =
                         )
 
                     _ ->
-                        statusResponse 405
-                        |> Result
+                        statusResponse 405 |> Result
             )
         ]
 

@@ -35,13 +35,17 @@ gameDecoder : Decoder Game
 gameDecoder =
     Json.map8 Game
         (field "name" string)
+        (field "config" gameConfigDecoder)
         (field "test" bool)
         (field "seed" (succeed 0))
         (field "users" <| list gameUser)
         (field "round" round)
         (field "history" <| list round)
         (field "messages" <| list message)
+    |> andThen (\p ->
+        map p
         (field "log" <| list gameUpdate)
+    )
 
 
 round : Decoder Round
@@ -192,20 +196,11 @@ messageType =
         |> andThen
             (\string ->
                 case string of
-                    "Error" ->
-                        succeed Error
-
-                    "Warning" ->
-                        succeed Warning
-
-                    "Info" ->
-                        succeed Info
-
-                    "Success" ->
-                        succeed Success
-
-                    _ ->
-                        fail ("Not valid pattern for decoder to MessageType. Pattern: " ++ toString string)
+                    "Error" -> succeed Error
+                    "Warning" -> succeed Warning
+                    "Info" -> succeed Info
+                    "Success" -> succeed Success
+                    _ -> fail ("Not valid pattern for decoder to MessageType. Pattern: " ++ toString string)
             )
 
 
@@ -218,6 +213,7 @@ gameEncoder : Game -> Value
 gameEncoder game =
     JE.object
         [ ( "name", JE.string game.name )
+        , ( "config", gameConfigEncoder game.config )
         , ( "test", JE.bool game.test )
         , ( "seed", JE.int game.seed )
         , ( "users"
@@ -351,14 +347,16 @@ encodeSuit item =
 
 awaitingTableDecoder : Decoder AwaitingTable
 awaitingTableDecoder =
-    Json.map4 AwaitingTable
+    Json.map5 AwaitingTable
         (field "name" string)
+        (field "config" gameConfigDecoder)
         (field "users" <|
             list
-                (map3 AwaitingTableUser
+                (map4 AwaitingTableUser
                     (field "name" string)
                     (field "lastCheck" float)
-                    (field "pressedStart" bool))
+                    (field "pressedStart" bool)
+                    (field "human" bool))
         )
         (field "test" bool)
         (field "seed" (succeed 0))
@@ -368,6 +366,7 @@ awaitingTableEncoder : AwaitingTable -> Value
 awaitingTableEncoder table =
     JE.object
         [ ( "name", JE.string table.name )
+        , ( "config", gameConfigEncoder table.config )
         , ( "seed", JE.int table.seed )
         , ( "users"
           , JE.list
@@ -376,6 +375,7 @@ awaitingTableEncoder table =
                         [ ("name", JE.string user.name)
                         , ("lastCheck", JE.float user.lastCheck)
                         , ("pressedStart", JE.bool user.pressedStart)
+                        , ("human", JE.bool user.human)
                         ]
                     ) table.users
                 )

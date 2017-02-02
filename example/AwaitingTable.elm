@@ -2,6 +2,7 @@ module AwaitingTable exposing (..)
 
 
 import String
+import Json.Decode as Json
 import Task exposing (..)
 import Time exposing (second)
 import Http exposing (Error(..))
@@ -99,7 +100,7 @@ createGame table r =
         case List.map (\user -> get user.name users) table.users of
             a :: b :: c :: d :: [] ->
                 put table.name
-                    (initGame table.name table.test table.seed table.users)
+                    (initGame table.name table.config table.test table.seed table.users)
                     games
                 |> andThenReturn (succeed r)
             _ ->
@@ -129,7 +130,7 @@ joinAwaitingTable api id =
                         put id { table | users =
                             (table.users
                              ++
-                             [ AwaitingTableUser session.username api.request.time False ] )
+                             [ AwaitingTableUser session.username api.request.time False True ] )
                         } awaitingTables
                         |> andThenReturn (statusResponse 201 |> Task.succeed)
             )
@@ -165,35 +166,43 @@ postAwaitingTable api id =
     api.doWithSession
         (\session ->
             (get id awaitingTables)
-                -- create new table only if table was not found in db
-                |>
-                    onError
-                        (\error ->
-                            let
-                                table =
-                                    AwaitingTable id
-                                        [ AwaitingTableUser session.username api.request.time False ]
-                                        api.request.test
-                                        (if api.request.test then
-                                            getHeaderDefault "X-Test-Game-Seed"
-                                                (String.toInt >> (\r ->
-                                                    case r of
-                                                        Ok i -> i
-                                                        Err _ -> Basics.round api.request.time
-                                                ))
-                                                (Basics.round api.request.time)
-                                                api.request
-                                        else
-                                            (Basics.round api.request.time))
-                            in
-                                put id table awaitingTables
-                                    |> andThenReturn (Task.succeed table)
-                        )
-                -- if table exists, return error information that name is reserved
-                -- return created table
-                |>
-                    andThen
-                        (encode awaitingTableEncoder >> okResponse >> Task.succeed)
+            |> map Ok
+            -- create new table only if table was not found in db
+            |> onError (\error ->
+                case Json.decodeString gameConfigDecoder api.request.body of
+                    Ok gameConfig ->
+                        let
+                            table =
+                                AwaitingTable id
+                                    gameConfig
+                                    [ AwaitingTableUser session.username api.request.time False True ]
+                                    api.request.test
+                                    (if api.request.test then
+                                        getHeaderDefault "X-Test-Game-Seed"
+                                            (String.toInt >> (\r ->
+                                                case r of
+                                                    Ok i -> i
+                                                    Err _ -> Basics.round api.request.time
+                                            ))
+                                            (Basics.round api.request.time)
+                                            api.request
+                                    else
+                                        (Basics.round api.request.time))
+                        in
+                            put id table awaitingTables
+                                |> andThenReturn (Task.succeed <| Ok table)
+                    Err message ->
+                        Task.succeed <| Err message
+            )
+            -- if table exists, return error information that name is reserved
+            -- return created table
+            |> andThen (\result ->
+                case result of
+                    Ok table ->
+                        encode awaitingTableEncoder table |> okResponse |> Task.succeed
+                    Err message ->
+                        response 400 message |> Task.succeed
+            )
         )
 
 

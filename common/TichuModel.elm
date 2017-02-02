@@ -400,6 +400,7 @@ type alias GameUser =
 
 type alias Game =
     { name : String
+    , config : GameConfig
     , test : Bool
     , seed : Int
     , users : List GameUser
@@ -425,11 +426,13 @@ type alias AwaitingTableUser =
     { name : String
     , lastCheck : Time
     , pressedStart : Bool
+    , human : Bool
     }
 
 
 type alias AwaitingTable =
     { name : String
+    , config : GameConfig
     , users : List AwaitingTableUser
     , test : Bool
     , seed : Int
@@ -441,8 +444,8 @@ type UpdateGame
     | UpdateRound (Round -> Round)
 
 
-initGame : String -> Bool -> Int -> List AwaitingTableUser -> Game
-initGame name test seed users =
+initGame : String -> GameConfig -> Bool -> Int -> List AwaitingTableUser -> Game
+initGame name config test seed users =
     let
         gameUsers =
             List.map (\user ->
@@ -450,6 +453,7 @@ initGame name test seed users =
             ) users
     in
         { name = name
+        , config = config
         , test = test
         , seed = seed
         , users = gameUsers
