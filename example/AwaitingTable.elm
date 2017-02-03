@@ -93,20 +93,17 @@ startAwaitingTable api id =
 {-| Create Game if all players pressed start.
 -}
 createGame : AwaitingTable -> String -> Task Error String
-createGame table r =
+createGame table updatedTable =
     -- if all players clicked start, create table based on awaiting table
-    if List.all .pressedStart table.users
-    then
-        case List.map (\user -> get user.name users) table.users of
-            a :: b :: c :: d :: [] ->
-                put table.name
-                    (initGame table.name table.config table.test table.seed table.users)
-                    games
-                |> andThenReturn (succeed r)
-            _ ->
-                Debug.crash "Illegal state"
+    if List.all .pressedStart table.users then
+        Task.map2 (,)
+            (put table.name
+                (initGame table.name table.config table.test table.seed table.users)
+                games)
+            (delete table.name awaitingTables)
+        |> andThenReturn (succeed updatedTable)
     else
-        succeed r
+        succeed updatedTable
 
 
 {-| Join table awaiting for all players.
@@ -181,9 +178,9 @@ postAwaitingTable api id =
                                             Humans ->
                                                 []
                                             _ ->
-                                                [ AwaitingTableUser "bot 1" api.request.time False False
-                                                , AwaitingTableUser "bot 2" api.request.time False False
-                                                , AwaitingTableUser "bot 3" api.request.time False False
+                                                [ AwaitingTableUser "bot 1" api.request.time True False
+                                                , AwaitingTableUser "bot 2" api.request.time True False
+                                                , AwaitingTableUser "bot 3" api.request.time True False
                                                 ]
 
                                     )
