@@ -354,7 +354,6 @@ type alias Player =
     { hand : List Card
     , cardsOnHand : Int
     , collected : List (List Cards)
-    , selection : List Card
     , name : String
     , score : Int
     , tichu : Bool
@@ -501,7 +500,6 @@ initPlayer cards name offset =
     { hand = take 14 <| drop (offset * 14) cards
     , cardsOnHand = 14
     , collected = []
-    , selection = []
     , name = name
     , score = 0
     , tichu = False

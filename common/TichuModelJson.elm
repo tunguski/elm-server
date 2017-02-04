@@ -159,11 +159,10 @@ rank =
 
 player : Decoder Player
 player =
-    map8 Player
+    map7 Player
         (field "hand" <| cardsDecoder)
         (field "cardsOnHand" <| int)
         (field "collected" <| list (list cardsDecoder))
-        (field "selection" <| cardsDecoder)
         (field "name" string)
         (field "score" int)
         (field "tichu" bool)
@@ -287,7 +286,6 @@ playerEncoder player =
         [ ( "hand", listToValue cardEncoder player.hand )
         , ( "cardsOnHand", JE.int player.cardsOnHand )
         , ( "collected", listToValue (listToValue (listToValue cardEncoder)) player.collected )
-        , ( "selection", listToValue cardEncoder player.selection )
         , ( "name", JE.string player.name )
         , ( "score", JE.int player.score )
         , ( "tichu", JE.bool player.tichu )
