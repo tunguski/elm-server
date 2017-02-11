@@ -15,6 +15,7 @@ import MongoDb exposing (..)
 import Rest exposing (..)
 import Server exposing (..)
 import SessionModel exposing (Session)
+import TichuBot exposing (tableChanged)
 import TichuModel exposing (..)
 import TichuModelJson exposing (..)
 import UserModel exposing (..)
@@ -58,32 +59,6 @@ doWithTable api id function =
             function session table table.round
                 (getPlayer table.round session.username)
         )
-    )
-
-
-gamePostRequestPart msg request =
-    P "games"
-        [ S (\id ->
-            [ F (\() -> Nothing)
-            , PF "seeAllCards" (\() -> gamePostRequest msg request id)
-            , PF "exchangeCards" (\() -> gamePostRequest msg request id)
-            , PF "declareTichu" (\() -> gamePostRequest msg request id)
-            , PF "declareGrandTichu" (\() -> gamePostRequest msg request id)
-            , PF "pass" (\() -> gamePostRequest msg request id)
-            , PF "hand" (\() -> gamePostRequest msg request id)
-            , PF "giveDragon" (\() -> gamePostRequest msg request id)
-            ]
-          )
-        ]
-
-
-gamePostRequest msg request idTable =
-    Just (
-        Process.sleep 3000
-        |> Task.map (\_ ->
-            Debug.log "slept async!" idTable
-        )
-        |> Task.attempt msg
     )
 
 
@@ -410,5 +385,39 @@ giveDragon api id =
                 |> andThenReturn (statusResponse 200 |> Task.succeed)
         )
     )
+
+
+gamePostRequest msg request idTable =
+    Process.sleep 1000
+    |> andThen (\_ -> get idTable games)
+    |> map (\table ->
+        table.users
+        |> List.indexedMap (,)
+        |> List.filter (\(i, player) -> not player.human)
+        |> List.filterMap (\(i, player) ->
+            tableChanged player.name table
+        )
+        |> Task.sequence
+    )
+    |> map (toString >> Debug.log "postRequest")
+    |> mapError toString
+    |> attempt msg
+    |> Just
+
+
+gamePostRequestPart msg request =
+    P "games"
+        [ S (\id ->
+            [ F (\() -> Nothing)
+            , PF "seeAllCards" (\() -> gamePostRequest msg request id)
+            , PF "exchangeCards" (\() -> gamePostRequest msg request id)
+            , PF "declareTichu" (\() -> gamePostRequest msg request id)
+            , PF "declareGrandTichu" (\() -> gamePostRequest msg request id)
+            , PF "pass" (\() -> gamePostRequest msg request id)
+            , PF "hand" (\() -> gamePostRequest msg request id)
+            , PF "giveDragon" (\() -> gamePostRequest msg request id)
+            ]
+          )
+        ]
 
 

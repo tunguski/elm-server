@@ -394,6 +394,7 @@ type alias Message =
 type alias GameUser =
     { name : String
     , lastCheck : Time
+    , human : Bool
     }
 
 
@@ -448,7 +449,7 @@ initGame name config test seed users =
     let
         gameUsers =
             List.map (\user ->
-                GameUser user.name user.lastCheck
+                GameUser user.name user.lastCheck user.human
             ) users
     in
         { name = name

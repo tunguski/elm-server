@@ -36,7 +36,7 @@ main =
 
 type Msg
     = SendResponse Response
-    | PostRequestMsg (Result Never String)
+    | PostRequestMsg (Result String String)
 
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg

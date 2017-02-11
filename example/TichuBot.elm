@@ -24,7 +24,14 @@ import UrlParse exposing (..)
 -}
 tableChanged : String -> Game -> Maybe (Task String String)
 tableChanged botName gameState =
-    Nothing
+    let
+        actualPlayer = getActualPlayer gameState.round
+    in
+        case actualPlayer.name == botName of
+            True ->
+                Debug.log "actual bot!" Nothing
+            False ->
+                Debug.log "bot!" Nothing
 
 
 

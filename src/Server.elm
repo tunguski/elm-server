@@ -302,7 +302,7 @@ update initializer updater postRequestUpdater msg model =
                                         , Cmd.map (InternalPostRequestMsg request.id) msg
                                         ]
                                 Nothing ->
-                                    Dict.remove request.id model ! []
+                                    Dict.remove request.id model ! [ sendResponse request response ]
 
                         Command cmd ->
                             model

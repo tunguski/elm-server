@@ -63,9 +63,10 @@ round =
 
 gameUser : Decoder GameUser
 gameUser =
-    Json.map2 GameUser
+    Json.map3 GameUser
         (field "name" string)
         (field "lastCheck" float)
+        (field "human" bool)
 
 
 cardsDecoder : Decoder (List Card)
@@ -241,6 +242,7 @@ gameUserEncoder gameUser =
     JE.object
         [ ( "name", JE.string gameUser.name )
         , ( "lastCheck", JE.float gameUser.lastCheck )
+        , ( "human", JE.bool gameUser.human )
         ]
 
 
