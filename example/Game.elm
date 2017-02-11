@@ -1,10 +1,11 @@
 module Game exposing (..)
 
 
+import Http exposing (Error(..))
+import Process
 import String
 import Task exposing (..)
 import Time exposing (second)
-import Http exposing (Error(..))
 
 
 import ApiPartApi exposing (..)
@@ -47,11 +48,42 @@ gamesApiPart api =
         ]
 
 
+doWithTable : ApiPartApi msg -> String ->
+              (Session -> Game -> Round -> Player -> Task Error Response) ->
+              Partial msg
 doWithTable api id function =
     api.doWithSession (\session ->
-        get id games |> andThen (\table ->
+        get id games
+        |> andThen (\table ->
             function session table table.round
-                (getPlayer table.round session.username))
+                (getPlayer table.round session.username)
+        )
+    )
+
+
+gamePostRequestPart msg request =
+    P "games"
+        [ S (\id ->
+            [ F (\() -> Nothing)
+            , PF "seeAllCards" (\() -> gamePostRequest msg request id)
+            , PF "exchangeCards" (\() -> gamePostRequest msg request id)
+            , PF "declareTichu" (\() -> gamePostRequest msg request id)
+            , PF "declareGrandTichu" (\() -> gamePostRequest msg request id)
+            , PF "pass" (\() -> gamePostRequest msg request id)
+            , PF "hand" (\() -> gamePostRequest msg request id)
+            , PF "giveDragon" (\() -> gamePostRequest msg request id)
+            ]
+          )
+        ]
+
+
+gamePostRequest msg request idTable =
+    Just (
+        Process.sleep 3000
+        |> Task.map (\_ ->
+            Debug.log "slept async!" idTable
+        )
+        |> Task.attempt msg
     )
 
 

@@ -28,7 +28,7 @@ import UrlParse exposing (..)
 
 
 main =
-    Server.program init update
+    Server.program init update postRequestUpdater
 
 
 -- UPDATE
@@ -36,6 +36,7 @@ main =
 
 type Msg
     = SendResponse Response
+    | PostRequestMsg (Result Never String)
 
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg
@@ -144,5 +145,23 @@ update request msg =
     case msg of
         SendResponse response ->
             Result response
+
+        PostRequestMsg result ->
+            Noop
+
+
+postRequestUpdater request =
+    let
+        restMap =
+            P "api"
+                [ gamePostRequestPart PostRequestMsg request
+                ]
+    in
+        case parse restMap request.url of
+            Ok cmd ->
+                cmd
+
+            Err error ->
+                Nothing
 
 

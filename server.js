@@ -20,8 +20,8 @@ function startElmServer() {
   delete require.cache[require.resolve('./main')]
   var elm = require('./main');
   app = elm.Example.worker();
-  
-  
+
+
   app.ports.sendResponsePort.subscribe(function(response) {
     var reqRes = requestCache[response.idRequest];
     if (reqRes) {
@@ -29,7 +29,7 @@ function startElmServer() {
         reqRes.res.setHeader(header[0], header[1]);
       });
       reqRes.res.setHeader('Access-Control-Allow-Origin', 'http://localhost:8000');
-  
+
       if (response.statusCode) {
         reqRes.res.statusCode = response.statusCode;
       }
@@ -53,7 +53,7 @@ function startElmServer() {
       }
       reqRes.res.end();
       requestCache[response.idRequest] = undefined;
-  
+
       console.log('' + new Date().getTime() - reqRes.startTime + 'ms: ' + reqRes.req.url);
     } else {
       console.log("[SEVERE ERROR] Could not find request id!");
@@ -68,10 +68,10 @@ startElmServer();
 
 const server = http.createServer((req, res) => {
   var id = '' + Math.random();
-  requestCache[id] = { 
-    req : req, 
-    res : res, 
-    startTime : new Date().getTime() 
+  requestCache[id] = {
+    req : req,
+    res : res,
+    startTime : new Date().getTime()
   };
 
   function objectToMap (obj) {
@@ -96,9 +96,9 @@ const server = http.createServer((req, res) => {
     }
 
     // at this point, `body` has the entire request body stored in it as a string
-    
-    app.ports.request.send({ 
-      id : id, 
+
+    app.ports.request.send({
+      id : id,
       time : new Date().getTime(),
       url : req.url.substr(0, req.url.indexOf("?")) || req.url,
       headers : objectToMap(req.headers),
@@ -120,7 +120,7 @@ function elmBuilder (paths, cmd, postBuild) {
     changed : false
   };
 
-  
+
   var exec;
 
 
@@ -128,7 +128,7 @@ function elmBuilder (paths, cmd, postBuild) {
     if (builder.changed && !exec) {
       exec = require('child_process').exec;
       builder.changed = false;
-      
+
       console.log('Starting build ' + paths);
       exec(cmd, function(error, stdout, stderr) {
         exec = undefined;
@@ -160,7 +160,7 @@ function elmBuilder (paths, cmd, postBuild) {
         // f was changed
         builder.changed = true;
       }
-  
+
       maybeBuild();
     });
   });
@@ -197,3 +197,4 @@ server.on('clientError', (err, socket) => {
 const port = 8080;
 server.listen(port);
 console.log('\nBackend server listening on port ' + port);
+

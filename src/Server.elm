@@ -12,6 +12,7 @@ import Time exposing (Time)
 type Partial msg
     = Result Response
     | Command (Cmd msg)
+    | Noop
 
 
 -- -- generic state of request processing
@@ -27,15 +28,22 @@ type alias Updater msg =
     Request -> msg -> Partial msg
 
 
+type alias PostRequestUpdater msg =
+    Request -> Maybe (Cmd msg)
+
+
 -- -- helper function that modifies state according to message
 -- type alias StateUpdater msg state = State msg state -> State msg state
 
 
-program : Initializer msg -> Updater msg -> Program Never (Dict String Request) (ServerMsg msg)
-program initializer updater =
+program : Initializer msg ->
+          Updater msg ->
+          PostRequestUpdater msg ->
+          Program Never (Dict String Request) (ServerMsg msg)
+program initializer updater postRequestUpdater =
     Platform.program
         { init = ( empty, Cmd.none )
-        , update = update initializer updater
+        , update = update initializer updater postRequestUpdater
         , subscriptions = subscriptions
         }
 
@@ -146,23 +154,12 @@ logErrorAndReturn error =
 parseRequestMethod : String -> Maybe RequestMethod
 parseRequestMethod method =
     case String.toLower method of
-        "get" ->
-            Just Get
-
-        "post" ->
-            Just Post
-
-        "put" ->
-            Just Put
-
-        "patch" ->
-            Just Patch
-
-        "delete" ->
-            Just Delete
-
-        _ ->
-            Nothing
+        "get" ->    Just Get
+        "post" ->   Just Post
+        "put" ->    Just Put
+        "patch" ->  Just Patch
+        "delete" -> Just Delete
+        _ -> Nothing
 
 
 getCookies : Request -> Dict String String
@@ -249,6 +246,7 @@ type alias Model =
 type ServerMsg msg
     = IncomingRequest PortRequest
     | InternalServerMsg String msg
+    | InternalPostRequestMsg String msg
 
 
 port sendResponsePort : PortResponse -> Cmd msg
@@ -263,21 +261,31 @@ sendResponse request response =
 update :
     Initializer m
     -> Updater m
+    -> PostRequestUpdater m
     -> ServerMsg m
     -> Model
     -> ( Model, Cmd (ServerMsg m) )
-update initializer updater msg model =
+update initializer updater postRequestUpdater msg model =
     case msg of
         IncomingRequest r ->
             case parseRequest r of
                 Just request ->
                     case initializer request of
                         Result response ->
-                            model ! [ sendResponse request response ]
+                            case postRequestUpdater request of
+                                Just msg ->
+                                    Dict.insert request.id request model !
+                                        [ sendResponse request response
+                                        , Cmd.map (InternalPostRequestMsg request.id) msg
+                                        ]
+                                Nothing ->
+                                    model ! [ sendResponse request response ]
 
                         Command cmd ->
                             Dict.insert request.id request model
                                 ! [ Cmd.map (InternalServerMsg request.id) cmd ]
+                        Noop ->
+                            model ! []
 
                 Nothing ->
                     model ! [ sendResponse (baseRequest r) (Response [] 400 "") ]
@@ -287,14 +295,27 @@ update initializer updater msg model =
                 Just request ->
                     case updater request internalMessage of
                         Result response ->
-                            model ! [ sendResponse request response ]
+                            case postRequestUpdater request of
+                                Just msg ->
+                                    model !
+                                        [ sendResponse request response
+                                        , Cmd.map (InternalPostRequestMsg request.id) msg
+                                        ]
+                                Nothing ->
+                                    Dict.remove request.id model ! []
 
                         Command cmd ->
-                            Dict.remove request.id model
+                            model
                                 ! [ Cmd.map (InternalServerMsg idRequest) cmd ]
 
+                        Noop ->
+                            model ! []
+
                 Nothing ->
-                    Debug.crash "Illegal state"
+                    Debug.log "Illegal state" <| model ! []
+
+        InternalPostRequestMsg idRequest postRequestMsg ->
+            model ! []
 
 
 port request : (PortRequest -> msg) -> Sub msg
