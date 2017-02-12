@@ -158,10 +158,7 @@ postRequestUpdater request =
                 ]
     in
         case parse restMap request.url of
-            Ok cmd ->
-                cmd
-
-            Err error ->
-                Nothing
+            Ok cmd -> cmd
+            Err error -> Nothing
 
 

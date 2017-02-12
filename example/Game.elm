@@ -387,10 +387,14 @@ giveDragon api id =
     )
 
 
-gamePostRequest msg request idTable =
+gamePostRequest : (Result String String -> msg) ->
+                  Request ->
+                  String ->
+                  Maybe (Cmd msg)
+gamePostRequest m request idTable =
     Process.sleep 1000
     |> andThen (\_ -> get idTable games)
-    |> map (\table ->
+    |> andThen (\table ->
         table.users
         |> List.indexedMap (,)
         |> List.filter (\(i, player) -> not player.human)
@@ -401,7 +405,7 @@ gamePostRequest msg request idTable =
     )
     |> map (toString >> Debug.log "postRequest")
     |> mapError toString
-    |> attempt msg
+    |> attempt m
     |> Just
 
 

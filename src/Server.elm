@@ -315,7 +315,7 @@ update initializer updater postRequestUpdater msg model =
                     Debug.log "Illegal state" <| model ! []
 
         InternalPostRequestMsg idRequest postRequestMsg ->
-            model ! []
+            Dict.remove idRequest model ! []
 
 
 port request : (PortRequest -> msg) -> Sub msg
