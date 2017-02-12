@@ -10,20 +10,15 @@ import Http exposing (Error(..))
 import ApiPartApi exposing (..)
 import BaseModel exposing (..)
 import ExampleDb exposing (games)
-import TichuRest as TR
 import MongoDb exposing (..)
 import Rest exposing (..)
 import Server exposing (..)
 import SessionModel exposing (Session)
 import TichuModel exposing (..)
 import TichuModelJson exposing (..)
+import TichuLogic exposing (..)
 import UserModel exposing (..)
 import UrlParse exposing (..)
-
-
-gamesWithSession token =
-    TR.games
-    |> withHeader "X-Test-Session" token
 
 
 {-| Maybe make bot's move. Returned task describes what bot want's to do.
@@ -37,11 +32,21 @@ tableChanged botName gameState =
             True ->
                 case hasCard MahJong actualPlayer of
                     True ->
-                        gamesWithSession actualPlayer.name
-                        |> withBody (encodeCards [ MahJong ])
-                        |> Debug.log "play mahjong!"
-                        |> postCommand (gameState.name ++ "/hand")
-                        |> Just
+                        handWithParsedCards
+                            gameState
+                            gameState.round
+                            actualPlayer
+                            (buildHandParams botName gameState gameState.round actualPlayer [ MahJong ])
+                        |> (\result ->
+                            case result of
+                                Ok task ->
+                                    task
+                                    |> map toString
+                                    |> Just
+                                Err err ->
+                                    Debug.log ("Error when tried to play cards!" ++ toString err) Nothing
+                        )
+
 
                     False ->
                         Debug.log "ignore!" Nothing

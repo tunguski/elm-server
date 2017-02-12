@@ -18,6 +18,7 @@ import SessionModel exposing (Session)
 import TichuBot exposing (tableChanged)
 import TichuModel exposing (..)
 import TichuModelJson exposing (..)
+import TichuLogic exposing (..)
 import UserModel exposing (..)
 import UrlParse exposing (..)
 
@@ -166,48 +167,6 @@ exchangeCards api id =
     )
 
 
-handWithParsedCards table round player param =
-    let
-        doPlayCards =
-            put table.name
-                (playHandAndUpdateRound table round player param)
-                games
-            |> andThenReturn (statusResponse 200 |> Task.succeed)
-        playCards =
-            if param.allowedTrick then
-                doPlayCards
-            else
-                response 400 "Trick does not match the one on table" |> Task.succeed
-    in
-        if param.isActualPlayer then
-            if param.isOpenDemand then
-                if param.hasDemandedCard then
-                    if param.isDemandedCardInTrick then
-                        -- play, switch to next player and return ok
-                        playCards
-                    else
-                        response 400 "You have to play demanded card" |> Task.succeed
-                else
-                    -- play, switch to next player and return ok
-                    playCards
-            else
-                if param.isBomb && param.bombEnoughPower then
-                    -- play, switch to next player and return ok
-                    doPlayCards
-                else
-                    -- play, switch to next player and return ok
-                    playCards
-        else
-            if param.isBomb then
-                if param.bombEnoughPower then
-                    -- play, switch to next player and return ok
-                    doPlayCards
-                else
-                    response 400 "Too weak bomb" |> Task.succeed
-            else
-                response 400 "You are not actual player" |> Task.succeed
-
-
 {-| Place a hand on table
 
 1. Check if it is actual player or played a bomb (higher if there was bomb before)
@@ -231,16 +190,14 @@ hand api id =
                         table
                         round
                         player
-                        { isActualPlayer = (getActualPlayer round).name == session.username
-                        , isOpenDemand = openDemand round
-                        , hasDemandedCard = openDemandMatch round
-                        , parsedCards = cards
-                        , trick = Debug.log "trick" <| parseTrick cards
-                        , allowedTrick = allowedCombination (List.head round.table) cards
-                        , isDemandedCardInTrick = cardInTrick round.demand cards
-                        , isBomb = bomb (parseTrick cards)
-                        , bombEnoughPower = True
-                        }
+                        (buildHandParams session.username table round player cards)
+                    |> (\result ->
+                        case result of
+                            Ok task ->
+                                task
+                            Err (code, message) ->
+                                response code message |> Task.succeed
+                    )
                 )
             _ ->
                 response 400 "Malformed cards" |> Task.succeed
