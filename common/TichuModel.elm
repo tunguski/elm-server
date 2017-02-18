@@ -683,43 +683,6 @@ updatePlayerPlayingHand player param =
         })
 
 
-playHandAndUpdateRound table round player param =
-    case param.parsedCards of
-        Dog :: [] ->
-            { table |
-                round =
-                    { round | actualPlayer = (round.actualPlayer + 2) % 4 }
-                    |> setTableHandOwnerAsActualPlayer player
-                    |> maybeIncActualPlayer
-                    |> updatePlayerPlayingHand player param
-                    |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
-                    |> (\round ->
-                        let
-                            player = getActualPlayer round
-                        in
-                            modifyPlayer
-                                player.name
-                                (\player -> { player
-                                    | collected = [ [ [ Dog ] ] ] ++ player.collected
-                                })
-                                round
-                    )
-                    -- putCardsOnTable param.parsedCards
-            }
-        _ ->
-            { table |
-                round =
-                    round
-                    |> updatePlayerPlayingHand player param
-                    |> setActualPlayer player
-                    |> setTableHandOwnerAsActualPlayer player
-                    |> maybeIncActualPlayer
-                    |> maybeSetWinner (removeCards param.parsedCards player.hand) round.actualPlayer
-                    |> putCardsOnTable param.parsedCards
-            }
-    |> maybeEndRound
-
-
 maybeEndRound table =
     table.round.players
     |> List.filter (.hand >> List.isEmpty >> not)

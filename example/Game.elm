@@ -50,10 +50,10 @@ gamesApiPart api =
         ]
 
 
-doWithTable : ApiPartApi msg -> String ->
-              (Session -> Game -> Round -> Player -> Task Error Response) ->
+doWithTable : (Session -> Game -> Round -> Player -> Task Error Response) ->
+              ApiPartApi msg -> String ->
               Partial msg
-doWithTable api id function =
+doWithTable function api id =
     api.doWithSession (\session ->
         get id games
         |> andThen (\table ->
@@ -61,25 +61,6 @@ doWithTable api id function =
                 (getPlayer table.round session.username)
         )
     )
-
-
-orElse : Bool -> String -> Maybe String -> Maybe String
-orElse condition errorText maybe =
-    case maybe of
-        Just text ->
-            Just text
-        Nothing ->
-            case condition of
-                True -> Nothing
-                False -> Just errorText
-
-
-executeIfNoError exec maybe =
-    case maybe of
-        Just error ->
-            response 400 (Debug.log "error: " error) |> Task.succeed
-        Nothing ->
-            exec
 
 
 {-| Pass player's move
@@ -91,21 +72,10 @@ executeIfNoError exec maybe =
 
 -}
 pass : ApiPartApi msg -> String -> Partial msg
-pass api id =
-    doWithTable api id (\session table round player ->
-        Nothing
-        |> orElse player.sawAllCards "Before playing you have to decide playing Grand Tichu or not"
-        |> orElse ((getActualPlayer round).name == session.username) "Not an actual player"
-        |> orElse (not <| openDemandMatch round) "You have demanded card"
-        |> orElse (not <| hasCard MahJong player) "You have MahJong"
-        |> orElse (not <| ifNothing round.tableHandOwner) "You cannot pass if you won last table"
-        |> executeIfNoError (
-            -- switch to next player and return ok
-            put table.name
-                { table | round = incActualPlayer round }
-                games
-            |> andThenReturn (statusResponse 200 |> Task.succeed)
-        )
+pass =
+    doWithTable (\session table round player ->
+        TichuLogic.pass session.username table round player
+        |> processingResultToTask
     )
 
 
@@ -125,46 +95,12 @@ ifNothing maybe =
 
 -}
 exchangeCards : ApiPartApi msg -> String -> Partial msg
-exchangeCards api id =
-    doWithTable api id (\session table round player ->
-        Nothing
-        |> orElse (ifNothing player.exchange) "You have exchanged already"
-        |> executeIfNoError (
-            let
-                exchangeCards = decodeCards api.request.body
-                hasAllCards =
-                    case exchangeCards of
-                        Ok cards ->
-                            List.all (flip hasCard <| player) cards
-                        Err _ ->
-                            False
-            in
-                if hasAllCards then
-                case exchangeCards of
-                    Ok (a :: b :: c :: []) ->
-                        put table.name
-                            ({ table | round =
-                                modifyPlayer session.username
-                                    (\player -> { player | exchange = Just (a, b, c) })
-                                    round
-                            }
-                            |> (\t ->
-                                case List.all (\p -> not <| ifNothing p.exchange) t.round.players of
-                                    True ->
-                                        exchangeCardsBetweenPlayers t
-                                    False ->
-                                        t
-                            ))
-                        games
-                        |> andThenReturn (statusResponse 200 |> Task.succeed)
-                    Ok _ ->
-                        response 400 "You have to exchange exactly 3 cards" |> Task.succeed
-                    Err msg ->
-                        response 400 "Could not decode exchanged cards" |> Task.succeed
-                else
-                    response 400 "Tried to exchange card you don't own" |> Task.succeed
-        )
-    )
+exchangeCards api =
+    doWithTable (\session table round player ->
+        TichuLogic.exchangeCards session.username table round player
+            (decodeCards api.request.body)
+        |> processingResultToTask
+    ) api
 
 
 {-| Place a hand on table
@@ -177,31 +113,20 @@ exchangeCards api id =
 
 -}
 hand : ApiPartApi msg -> String -> Partial msg
-hand api id =
-    doWithTable api id (\session table round player ->
+hand api =
+    doWithTable (\session table round player ->
         case decodeCards api.request.body of
             Ok cards ->
-                Nothing
-                |> orElse (List.all (flip hasCard <| player) cards) "Tried to play card you don't own"
-                |> orElse (List.all (.exchange >> ifNothing >> not) round.players)
-                          "You have to exchange cards first"
-                |> executeIfNoError (
-                    handWithParsedCards
-                        table
-                        round
-                        player
-                        (buildHandParams session.username table round player cards)
-                    |> (\result ->
-                        case result of
-                            Ok task ->
-                                task
-                            Err (code, message) ->
-                                response code message |> Task.succeed
-                    )
-                )
+                TichuLogic.hand
+                    session.username
+                    table
+                    round
+                    player
+                    cards
+                |> processingResultToTask
             _ ->
                 response 400 "Malformed cards" |> Task.succeed
-    )
+    ) api
 
 
 {-| Declare tichu
@@ -211,10 +136,8 @@ hand api id =
 
 -}
 declareTichu : ApiPartApi msg -> String -> Partial msg
-declareTichu api id =
-    updateAndReturnIf api id
-        (.cardsOnHand >> (==) 14)
-        (\player -> { player | tichu = True })
+declareTichu =
+    updateAndReturnIf TichuLogic.declareTichu
 
 
 {-| Declare grand tichu
@@ -224,13 +147,8 @@ declareTichu api id =
 
 -}
 declareGrandTichu : ApiPartApi msg -> String -> Partial msg
-declareGrandTichu api id =
-    updateAndReturnIf api id
-        (.sawAllCards >> not)
-        (\player -> { player
-                    | grandTichu = True
-                    , sawAllCards = True
-                    })
+declareGrandTichu =
+    updateAndReturnIf TichuLogic.declareGrandTichu
 
 
 {-| If player does not want to play grand tichu, he may see all cards
@@ -240,24 +158,17 @@ declareGrandTichu api id =
 
 -}
 seeAllCards : ApiPartApi msg -> String -> Partial msg
-seeAllCards api id =
-    updateAndReturnIf api id
-        (.sawAllCards >> not)
-        (\player -> { player | sawAllCards = True })
+seeAllCards =
+    updateAndReturnIf TichuLogic.seeAllCards
 
 
 {-| If condition is met (pass player to it), then
     execute update function on player.
 -}
-updateAndReturnIf api id condition update =
-    doWithTable api id (\session table round player ->
-        if condition player then
-            put table.name { table | round =
-                modifyPlayer session.username update round
-            } games
-            |> andThenReturn (statusResponse 200 |> Task.succeed)
-        else
-            statusResponse 400 |> Task.succeed
+updateAndReturnIf exec =
+    doWithTable (\session table round player ->
+        exec session.username table round player
+        |> processingResultToTask
     )
 
 
@@ -312,36 +223,12 @@ getGame api id =
 
 
 giveDragon : ApiPartApi msg -> String -> Partial msg
-giveDragon api id =
-    doWithTable api id (\session table round player ->
-        Nothing
-        |> orElse (
-            case round.tableHandOwner of
-                Just owner ->
-                    owner == round.actualPlayer
-                    && (getNthPlayer round owner).name == session.username
-                _ ->
-                    False
-        ) "Not an actual player or not owner of Dragon"
-        |> orElse (case List.head round.table of
-            Just (Dragon :: []) -> True
-            _ -> False
-        ) "There is no Dragon on top of table"
-        |> executeIfNoError (
-            let
-                index =
-                    if (api.request.body == "next") then
-                        (round.actualPlayer + 1) % 4
-                    else
-                        (round.actualPlayer + 3) % 4
-            in
-                -- switch to next player and return ok
-                put table.name
-                    { table | round = giveDragonTo index round }
-                    games
-                |> andThenReturn (statusResponse 200 |> Task.succeed)
-        )
-    )
+giveDragon api =
+    doWithTable (\session table round player ->
+        TichuLogic.giveDragon session.username
+            table round player (api.request.body == "next")
+        |> processingResultToTask
+    ) api
 
 
 gamePostRequest : (Result String String -> msg) ->
@@ -360,7 +247,13 @@ gamePostRequest m request idTable =
         )
         |> Task.sequence
     )
-    |> map (toString >> Debug.log "postRequest")
+    |> map (\result ->
+        case result of
+            [] ->
+                ""
+            _ ->
+                Debug.log "postRequest" <| toString result
+    )
     |> mapError toString
     |> attempt m
     |> Just

@@ -32,56 +32,49 @@ tableChanged botName gameState =
             True ->
                 case hasCard MahJong actualPlayer of
                     True ->
-                        handWithParsedCards
-                            gameState
-                            gameState.round
-                            actualPlayer
-                            (buildHandParams botName gameState gameState.round actualPlayer [ MahJong ])
-                        |> (\result ->
-                            case result of
-                                Ok task ->
-                                    task
-                                    |> map toString
-                                    |> Just
-                                Err err ->
-                                    Debug.log ("Error when tried to play cards!" ++ toString err) Nothing
-                        )
-
+                        playCards botName gameState [ MahJong ]
 
                     False ->
-                        Debug.log "ignore!" Nothing
+                        case List.head gameState.round.table of
+                            Nothing ->
+                                List.head actualPlayer.hand
+                                |> Maybe.andThen (\c ->
+                                    playCards botName gameState [ c ]
+                                )
+
+                            Just [ card ] ->
+                                actualPlayer.hand
+                                |> List.filter (\c -> cardWeight c > cardWeight card)
+                                |> List.head
+                                |> Maybe.andThen (\c ->
+                                    playCards botName gameState [ c ]
+                                )
+                            _ ->
+                                Nothing
+                                --Debug.log "ignore!" Nothing
 
             False ->
                 Nothing
 
 
-        --declareGrandTichu (session, declare) =
-        --    case declare of
-        --        True ->
-        --            gamesWithSession session
-        --            |> postCommand (tableName ++ "/declareGrandTichu")
-        --        False ->
-        --            gamesWithSession session
-        --            |> postCommand (tableName ++ "/seeAllCards")
-        --exchangeCards (cards, session) =
-        --     gamesWithSession session
-        --     |> withBody (encodeCards cards)
-        --     |> postCommand (tableName ++ "/exchangeCards")
+playCards botName gameState cards =
+    let
+        actualPlayer = getActualPlayer gameState.round
+    in
+        hand
+            botName
+            gameState
+            gameState.round
+            actualPlayer
+            cards
+        |> (\result ->
+            case result of
+                Ok task ->
+                    task
+                    |> map toString
+                    |> Just
+                Err err ->
+                    Debug.log ("Error when tried to play cards!" ++ toString err) Nothing
+        )
 
-                --Pass session ->
-                --    gamesWithSession session
-                --    |> postCommand (tableName ++ "/pass")
 
-                --Play session list ->
-                --    gamesWithSession session
-                --    |> withBody (encodeCards list)
-                --    |> postCommand (tableName ++ "/hand")
-
-                --Tichu session ->
-                --    gamesWithSession session
-                --    |> postCommand (tableName ++ "/declareTichu")
-
-                --GiveDragon session body ->
-                --    gamesWithSession session
-                --    |> withBody body
-                --    |> postCommand (tableName ++ "/giveDragon")
