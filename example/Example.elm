@@ -36,7 +36,7 @@ main =
 
 type Msg
     = SendResponse Response
-    | PostRequestMsg (Result String String)
+    | PostRequestMsg (Result String (Maybe (Cmd Msg)))
 
 
 withSession : Request -> (Session -> Task Error Response) -> Partial Msg
@@ -147,7 +147,11 @@ update request msg =
             Result response
 
         PostRequestMsg result ->
-            Noop
+            case Debug.log "PRM result" result of
+                Ok (Just cmd) ->
+                    Command cmd
+                _ ->
+                    Noop
 
 
 postRequestUpdater request =
@@ -157,7 +161,7 @@ postRequestUpdater request =
                 [ gamePostRequestPart PostRequestMsg request
                 ]
     in
-        case parse restMap request.url of
+        case Debug.log "pRU" <| parse restMap request.url of
             Ok cmd -> cmd
             Err error -> Nothing
 

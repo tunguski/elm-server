@@ -315,7 +315,21 @@ update initializer updater postRequestUpdater msg model =
                     Debug.log "Illegal state" <| model ! []
 
         InternalPostRequestMsg idRequest postRequestMsg ->
-            Dict.remove idRequest model ! []
+            case Dict.get idRequest model of
+                Just request ->
+                    case updater request postRequestMsg of
+                        Result response ->
+                            Debug.log "Illegal state" <| model ! []
+
+                        Command cmd ->
+                            model
+                                ! [ Cmd.map (InternalServerMsg idRequest) cmd ]
+
+                        Noop ->
+                            Dict.remove idRequest model ! []
+
+                Nothing ->
+                    Debug.log "Illegal state" <| model ! []
 
 
 port request : (PortRequest -> msg) -> Sub msg

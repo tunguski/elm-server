@@ -245,7 +245,7 @@ giveDragon api =
     ) api
 
 
-gamePostRequest : (Result String String -> msg) ->
+gamePostRequest : (Result String (Maybe (Cmd msg)) -> msg) ->
                   String ->
                   Maybe (Cmd msg)
 gamePostRequest m idTable =
@@ -261,6 +261,7 @@ gamePostRequest m idTable =
             |> andThen (
                 tableChanged player.name
                 >> Maybe.withDefault (Task.succeed "no move")
+                >> Debug.log "ok, the task"
             )
         )
         |> Task.sequence
@@ -268,11 +269,13 @@ gamePostRequest m idTable =
     |> map (\result ->
         case result of
             [] ->
-                ""
+                Nothing
             _ ->
-                Debug.log "postRequest" <| toString result
+                gamePostRequest m idTable
+                |> Debug.log "internal gamePostRequest"
     )
     |> mapError toString
+    |> Debug.log "ok, the task"
     |> attempt m
     |> Just
 
