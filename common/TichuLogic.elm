@@ -141,7 +141,7 @@ buildHandParams userName table round player cards =
 
 playHandAndUpdateRound table round player param =
     case param.parsedCards of
-        Dog :: [] ->
+        [ Dog ] ->
             { table |
                 round =
                     { round | actualPlayer = (round.actualPlayer + 2) % 4 }
@@ -192,6 +192,7 @@ pass userName table round player =
     )
 
 
+exchangeCards : String -> Game -> Round -> Player -> Result String (List Card) -> Result (Int, String) (Task Error Response)
 exchangeCards userName table round player exchangeCards =
     Nothing
     |> orElse (ifNothing player.exchange) "You have exchanged already"
@@ -205,27 +206,27 @@ exchangeCards userName table round player exchangeCards =
                         False
         in
             if hasAllCards then
-            case exchangeCards of
-                Ok (a :: b :: c :: []) ->
-                    put table.name
-                        ({ table | round =
-                            modifyPlayer userName
-                                (\player -> { player | exchange = Just (a, b, c) })
-                                round
-                        }
-                        |> (\t ->
-                            case List.all (\p -> not <| ifNothing p.exchange) t.round.players of
-                                True ->
-                                    exchangeCardsBetweenPlayers t
-                                False ->
-                                    t
-                        ))
-                    games
-                    |> okSucceed
-                Ok _ ->
-                    Err (400, "You have to exchange exactly 3 cards")
-                Err msg ->
-                    Err (400, "Could not decode exchanged cards")
+                case exchangeCards of
+                    Ok [a, b, c] ->
+                        put table.name
+                            ({ table | round =
+                                modifyPlayer userName
+                                    (\player -> { player | exchange = Just (a, b, c) })
+                                    round
+                            }
+                            |> (\t ->
+                                case List.all (\p -> not <| ifNothing p.exchange) t.round.players of
+                                    True ->
+                                        exchangeCardsBetweenPlayers t
+                                    False ->
+                                        t
+                            ))
+                        games
+                        |> okSucceed
+                    Ok _ ->
+                        Err (400, "You have to exchange exactly 3 cards")
+                    Err msg ->
+                        Err (400, "Could not decode exchanged cards")
             else
                 Err (400, "Tried to exchange card you don't own")
     )
@@ -297,7 +298,7 @@ giveDragon userName table round player giveToNext =
                 False
     ) "Not an actual player or not owner of Dragon"
     |> orElse (case List.head round.table of
-        Just (Dragon :: []) -> True
+        Just [ Dragon ] -> True
         _ -> False
     ) "There is no Dragon on top of table"
     |> executeIfNoError (

@@ -36,6 +36,7 @@ botMove : String -> Game -> Round -> Player -> HandParams ->
           Maybe (Result (Int, String) (Task Error Response))
 botMove botName game round player param =
     Nothing
+    -- declare grand tichu or see all cards
     |> executeIf (not player.sawAllCards) (\_ ->
         if False then
             declareGrandTichu botName game round player
@@ -46,10 +47,42 @@ botMove botName game round player param =
             |> Just
             |> Debug.log "seeAllCards"
     )
+    -- exchange cards
+    |> executeIf (player.sawAllCards) (\_ ->
+        case player.exchange of
+            Just _ ->
+                Nothing
+            Nothing ->
+                Maybe.map3 (\a b c ->
+                    exchangeCards botName game round player (Ok [a, b, c])
+                )
+                (player.hand |> List.reverse |> List.head)
+                (player.hand |> List.head)
+                (player.hand |> List.drop 1 |> List.head)
+
+    )
+    -- maybe declare tichu
     |> executeIf (player.sawAllCards && player.cardsOnHand == 14) (\_ ->
-        -- maybe declare tichu
         Nothing
     )
+    -- give dragon
+    |> executeIf ((
+        case round.tableHandOwner of
+            Just owner ->
+                owner == round.actualPlayer
+                && (getNthPlayer round owner).name == botName
+            _ ->
+                False
+        ) && (
+        case List.head round.table of
+            Just [ Dragon ] -> True
+            _ -> False
+    )) (\_ ->
+        giveDragon botName game round player False
+        |> Just
+        |> Debug.log "give the dragon"
+    )
+    -- play cards or pass
     |> executeIf (player.name == botName) (\_ ->
         let
             playHand = playCards botName game player
@@ -70,17 +103,22 @@ botMove botName game round player param =
                             player.hand
                             |> List.filter (\c -> cardWeight c > cardWeight card)
                             |> List.head
-                            |> Maybe.andThen (List.singleton >> playHand)
-                            |> Debug.log "highest card"
+                            |> Maybe.andThen (
+                                List.singleton
+                                >> playHand
+                                >> Debug.log "highest card"
+                            )
+                            |> Maybe.withDefault (
+                                pass botName game round player
+                                |> Debug.log "pass"
+                            )
+                            |> Just
                         _ ->
                             pass botName game round player
                             |> Just
                             |> Debug.log "pass"
     )
-    |> executeIf (True) (\_ ->
-        Nothing
-    )
-    |> executeIf (True) (\_ ->
+    |> executeIf (False) (\_ ->
         Nothing
     )
 
