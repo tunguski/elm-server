@@ -23,10 +23,10 @@ import TichuLogic exposing (..)
 tableChanged : String -> Game -> Maybe (Task Error String)
 tableChanged botName game =
     let
-        actualPlayer = getActualPlayer game.round
-        param = buildHandParams botName game game.round actualPlayer []
+        player = getPlayer game.round botName
+        param = buildHandParams botName game game.round player []
     in
-        botMove botName game game.round actualPlayer param
+        botMove botName game game.round player param
         |> Maybe.map (processingResultToTask >> map toString)
 
 
@@ -83,7 +83,8 @@ botMove botName game round player param =
         |> Debug.log "give the dragon"
     )
     -- play cards or pass
-    |> executeIf (player.name == botName) (\_ ->
+    |> executeIf (player.name == botName
+            && ((List.filterMap .exchange round.players |> List.length) == 4)) (\_ ->
         let
             playHand = playCards botName game player
         in
@@ -103,10 +104,10 @@ botMove botName game round player param =
                             player.hand
                             |> List.filter (\c -> cardWeight c > cardWeight card)
                             |> List.head
+                            |> Maybe.map (Debug.log "higher card")
                             |> Maybe.andThen (
                                 List.singleton
                                 >> playHand
-                                >> Debug.log "highest card"
                             )
                             |> Maybe.withDefault (
                                 pass botName game round player
@@ -120,6 +121,14 @@ botMove botName game round player param =
     )
     |> executeIf (False) (\_ ->
         Nothing
+    )
+    -- if game is finished, ignore any move
+    |> (\move ->
+        case game.finished of
+            Just _ ->
+                Nothing
+            _ ->
+                move
     )
 
 

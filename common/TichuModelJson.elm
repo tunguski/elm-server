@@ -43,8 +43,9 @@ gameDecoder =
         (field "history" <| list round)
         (field "messages" <| list message)
     |> andThen (\p ->
-        map p
+        Json.map2 p
         (field "log" <| list gameUpdate)
+        (field "finished" <| maybe (list int))
     )
 
 
@@ -223,6 +224,13 @@ gameEncoder game =
         , ( "history", JE.list (List.map roundEncoder game.history) )
         , ( "messages", JE.list (List.map messageEncoder game.messages) )
         , ( "log", JE.list [] )
+        , ( "finished",
+                case game.finished of
+                    Just list ->
+                        JE.list (List.map JE.int list)
+                    _ ->
+                        JE.null
+          )
         ]
 
 

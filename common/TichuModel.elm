@@ -301,7 +301,7 @@ allowedCombination table combination =
                     True
         Nothing ->
             False
-    ) |> Debug.log "allowedCombination"
+    )
 
 
 tryParse parser (combination, cards) =
@@ -408,6 +408,7 @@ type alias Game =
     , history : List Round
     , messages : List Message
     , log : List UpdateGame
+    , finished : Maybe (List Int)
     }
 
 
@@ -461,6 +462,7 @@ initGame name config test seed users =
         , history = []
         , messages = []
         , log = []
+        , finished = Nothing
         }
 
 
@@ -669,10 +671,22 @@ giveLoosersCards round =
 
 
 nextRound table =
-    { table
-    | round = initRound ((table.round.seed + 19) * 263) table.users
-    , history = (giveLoosersCards table.round) :: table.history
-    }
+    let
+        history = (giveLoosersCards table.round) :: table.history
+        ( t1, t2 ) = Debug.log "points:" <| calculateTeamPoints history
+    in
+        if t1 >= 1000 || t2 >= 1000 then
+            { table
+            | finished = Just [ t1, t2 ]
+            , history = history
+            }
+            |> Debug.log "end of game!"
+        else
+            { table
+            | round = initRound ((table.round.seed + 19) * 263) table.users
+            , history = history
+            }
+            |> Debug.log "end of round!"
 
 
 updatePlayerPlayingHand player param =
@@ -852,5 +866,29 @@ calculatePlayersPoints round =
                 pointsFromCards
         )
     )
+
+
+calculateHistoryPoints : List Round -> List (List Int)
+calculateHistoryPoints history =
+    List.map calculatePlayersPoints history
+
+
+calculateTeamPoints : List Round -> (Int, Int)
+calculateTeamPoints history =
+    let
+        points = calculateHistoryPoints history
+        summaries = List.foldl (\item sum ->
+                case (item, sum) of
+                    ([ i1, i2, i3, i4 ], [ s1, s2, s3, s4 ]) ->
+                        [ s1 + i1, s2 + i2, s3 + i3, s4 + i4 ]
+                    _ ->
+                        sum
+            ) [ 0, 0, 0, 0 ] points
+    in
+        case summaries of
+            [ p1, p2, p3, p4 ] ->
+                ( p1 + p3, p2 + p4 )
+            _ ->
+                ( 0, 0 )
 
 

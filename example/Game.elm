@@ -249,33 +249,29 @@ gamePostRequest : (Result String (Maybe (Cmd msg)) -> msg) ->
                   String ->
                   Maybe (Cmd msg)
 gamePostRequest m idTable =
-    Process.sleep 0
-    |> andThen (\_ -> get idTable games)
+    get idTable games
     |> andThen (\table ->
         table.users
         |> List.indexedMap (,)
         |> List.filter (\(i, player) -> not player.human)
         |> List.map (\(i, player) ->
-            Process.sleep (toFloat <| 100 * i)
+            Process.sleep (toFloat <| 50 * i)
             |> andThen (\_ -> get idTable games)
             |> andThen (
                 tableChanged player.name
                 >> Maybe.withDefault (Task.succeed "no move")
-                >> Debug.log "ok, the task"
             )
         )
         |> Task.sequence
     )
     |> map (\result ->
-        case result of
+        case List.filter ((/=) "no move") result of
             [] ->
                 Nothing
             _ ->
                 gamePostRequest m idTable
-                |> Debug.log "internal gamePostRequest"
     )
     |> mapError toString
-    |> Debug.log "ok, the task"
     |> attempt m
     |> Just
 

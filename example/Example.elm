@@ -147,7 +147,7 @@ update request msg =
             Result response
 
         PostRequestMsg result ->
-            case Debug.log "PRM result" result of
+            case result of
                 Ok (Just cmd) ->
                     Command cmd
                 _ ->
@@ -161,7 +161,7 @@ postRequestUpdater request =
                 [ gamePostRequestPart PostRequestMsg request
                 ]
     in
-        case Debug.log "pRU" <| parse restMap request.url of
+        case parse restMap request.url of
             Ok cmd -> cmd
             Err error -> Nothing
 
