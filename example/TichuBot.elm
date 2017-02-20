@@ -23,18 +23,19 @@ import TichuLogic exposing (..)
 tableChanged : String -> Game -> Maybe (Task Error String)
 tableChanged botName game =
     let
+        actualPlayer = getActualPlayer game.round
         player = getPlayer game.round botName
         param = buildHandParams botName game game.round player []
     in
-        botMove botName game game.round player param
+        botMove botName game game.round player actualPlayer param
         |> Maybe.map (processingResultToTask >> map toString)
 
 
 {-| Maybe make bot's move. Returned task describes what bot want's to do.
 -}
-botMove : String -> Game -> Round -> Player -> HandParams ->
+botMove : String -> Game -> Round -> Player -> Player -> HandParams ->
           Maybe (Result (Int, String) (Task Error Response))
-botMove botName game round player param =
+botMove botName game round player actualPlayer param =
     Nothing
     -- declare grand tichu or see all cards
     |> executeIf (not player.sawAllCards) (\_ ->
@@ -83,7 +84,7 @@ botMove botName game round player param =
         |> Debug.log "give the dragon"
     )
     -- play cards or pass
-    |> executeIf (player.name == botName
+    |> executeIf (actualPlayer.name == botName
             && ((List.filterMap .exchange round.players |> List.length) == 4)) (\_ ->
         let
             playHand = playCards botName game player
