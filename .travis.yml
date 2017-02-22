@@ -10,9 +10,10 @@ cache:
 
 before_script:
   - npm install
-  - elm-make --yes example/Example.elm --output main.js 
+  - git clone https://github.com/tunguski/elm-spa-example.git client
+  - elm-make --yes example/Example.elm --output main.js
   - node server.js &
-  - sleep 2 
+  - sleep 2
 
 script:
   - for i in $(seq 1 10); do curl http://localhost:8080 > "$i.log" ; done
