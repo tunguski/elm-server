@@ -550,6 +550,33 @@ getPlayer round name =
     |> defaultCrash ("Malformed state getPlayer: " ++ name ++ ": " ++ toString round)
 
 
+getPlayerPosition : Round -> String -> Int
+getPlayerPosition round name =
+    List.indexedMap (,) round.players
+    |> List.filter (\(i, player) -> player.name == name)
+    |> List.head
+    |> Maybe.map Tuple.first
+    |> Maybe.withDefault -1
+
+
+isNextOpponent : Round -> String -> String -> Maybe Bool
+isNextOpponent round userName opponentName =
+    let
+        userPosition = getPlayerPosition round userName
+        opponentPosition = getPlayerPosition round opponentName
+    in
+        if userPosition + 1 == opponentPosition || userPosition - 3 == opponentPosition
+        then
+            Just True
+        else
+            if userPosition - 1 == opponentPosition || userPosition + 3 == opponentPosition
+            then
+                Just False
+            else
+                Nothing
+
+
+
 modifyPlayer name function round =
     { round | players =
         List.map (\player ->
