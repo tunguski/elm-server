@@ -10,18 +10,13 @@ import Time exposing (Time)
 import Task exposing (..)
 
 
+import Common exposing (..)
 import ExampleDb exposing (games)
 import Server exposing (..)
 import Rest exposing (..)
 import TichuModel exposing (..)
 import TichuModelJson exposing (..)
 import UserModel exposing (User)
-
-
-ifNothing maybe =
-    case maybe of
-        Just _ -> False
-        Nothing -> True
 
 
 orElse : Bool -> String -> Maybe String -> Maybe String
@@ -93,7 +88,7 @@ hand userName table round player cards =
     in
         Nothing
         |> orElse (List.all (flip hasCard <| player) param.parsedCards) "Tried to play card you don't own"
-        |> orElse (List.all (.exchange >> ifNothing >> not) round.players)
+        |> orElse (List.all (.exchange >> isNothing >> not) round.players)
                   "You have to exchange cards first"
         |> executeIfNoError (
             if param.isActualPlayer then
@@ -182,7 +177,7 @@ pass userName table round player =
     |> orElse ((getActualPlayer round).name == userName) "Not an actual player"
     |> orElse (not <| openDemandMatch round) "You have demanded card"
     |> orElse (not <| hasCard MahJong player) "You have MahJong"
-    |> orElse (not <| ifNothing round.tableHandOwner) "You cannot pass if you won last table"
+    |> orElse (not <| isNothing round.tableHandOwner) "You cannot pass if you won last table"
     |> executeIfNoError (
         -- switch to next player and return ok
         put table.name
@@ -195,7 +190,7 @@ pass userName table round player =
 exchangeCards : String -> Game -> Round -> Player -> Result String (List Card) -> Result (Int, String) (Task Error Response)
 exchangeCards userName table round player exchangeCards =
     Nothing
-    |> orElse (ifNothing player.exchange) "You have exchanged already"
+    |> orElse (isNothing player.exchange) "You have exchanged already"
     |> executeIfNoError (
         let
             hasAllCards =
@@ -215,7 +210,7 @@ exchangeCards userName table round player exchangeCards =
                                     round
                             }
                             |> (\t ->
-                                case List.all (\p -> not <| ifNothing p.exchange) t.round.players of
+                                case List.all (\p -> not <| isNothing p.exchange) t.round.players of
                                     True ->
                                         exchangeCardsBetweenPlayers t
                                     False ->

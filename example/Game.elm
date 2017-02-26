@@ -93,12 +93,6 @@ pass =
     )
 
 
-ifNothing maybe =
-    case maybe of
-        Just _ -> False
-        Nothing -> True
-
-
 {-| Exchange cards
 
 1. Check is it start of round
