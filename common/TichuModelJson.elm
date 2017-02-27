@@ -31,13 +31,14 @@ gameConfigDecoder =
                 )
         )
 
+
 gameDecoder : Decoder Game
 gameDecoder =
     Json.map8 Game
         (field "name" string)
         (field "config" gameConfigDecoder)
         (field "test" bool)
-        (field "seed" (succeed 0))
+        (field "seed" int)
         (field "users" <| list gameUser)
         (field "round" round)
         (field "history" <| list round)
@@ -58,7 +59,7 @@ round =
         (field "tableHandOwner" (maybe int))
         (field "demand" (maybe rank))
         (field "demandCompleted" bool)
-        (field "seed" (succeed 0))
+        (field "seed" int)
         (field "winner" (maybe int))
 
 
@@ -367,7 +368,7 @@ awaitingTableDecoder =
                     (field "human" bool))
         )
         (field "test" bool)
-        (field "seed" (succeed 0))
+        (field "seed" int)
 
 
 awaitingTableEncoder : AwaitingTable -> Value
