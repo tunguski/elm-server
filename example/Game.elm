@@ -2,6 +2,7 @@ module Game exposing (..)
 
 
 import Http exposing (Error(..))
+import Murmur3
 import Process
 import String
 import Task exposing (..)
@@ -186,46 +187,74 @@ getGame : ApiPartApi msg -> String -> Partial msg
 getGame api id =
     api.doWithSession
         (\session ->
-            get id games
-            |> andThen
-                (\table ->
-                    put id
-                        { table
-                        | users = List.map (\user ->
-                                        if user.name /= session.username then
-                                            user
-                                        else
-                                            { user | lastCheck = api.request.time }
-                                    )
-                                    table.users
-                        } games
-                    |> andThenReturn (
-                        let
-                            round = table.round
-                        in
-                            ({ table
-                             | round =
-                                { round
-                                | players = List.map (\player ->
-                                        if player.name == session.username then
-                                            if player.sawAllCards then
-                                                player
+            let
+                getAndReturnIfChanged =
+                    get id games
+                    |> andThen
+                        (\table ->
+                            put id
+                                { table
+                                | users = List.map (\user ->
+                                                if user.name /= session.username then
+                                                    user
+                                                else
+                                                    { user | lastCheck = api.request.time }
+                                            )
+                                            table.users
+                                } games
+                            |> andThenReturn (
+                                let
+                                    round = table.round
+                                    obfuscatedGame =
+                                        -- obfuscate and show only 8 cards if did not declare grand/not
+                                        { table
+                                        | round =
+                                           { round
+                                           | players = List.map (\player ->
+                                                   if player.name == session.username then
+                                                       if player.sawAllCards then
+                                                           player
+                                                       else
+                                                           { player
+                                                           | hand = List.take 8 player.hand
+                                                           }
+                                                   else
+                                                       { player
+                                                       | hand = []
+                                                       , exchange = Nothing
+                                                       }
+                                               ) round.players
+                                           , seed = 0
+                                           }
+                                        , seed = 0
+                                        }
+                                    hashGameBase =
+                                        { obfuscatedGame
+                                        | users = List.map (\user ->
+                                            { user
+                                            | lastCheck = 0
+                                            }) table.users
+                                        }
+                                    gameHash =
+                                        Murmur3.hashString 17 (toString hashGameBase)
+                                    gameResponse =
+                                        encode gameEncoder obfuscatedGame
+                                        |> okResponse
+                                        |> Task.succeed
+                                in
+                                    case getParam "hash" api.request of
+                                        Just t ->
+                                            if t /= toString gameHash then
+                                                gameResponse
                                             else
-                                                { player
-                                                | hand = List.take 8 player.hand
-                                                }
-                                        else
-                                            { player
-                                            | hand = []
-                                            , exchange = Nothing
-                                            }
-                                    ) round.players
-                                , seed = 0
-                                }
-                             , seed = 0
-                             }
-                            |> (encode gameEncoder >> okResponse >> Task.succeed)))
-                )
+                                                Process.sleep 500.0
+                                                |> andThen (\_ -> getAndReturnIfChanged)
+                                        Nothing ->
+                                            gameResponse
+                                    )
+                        )
+            in
+                getAndReturnIfChanged
             |> onError logErrorAndReturn
         )
 

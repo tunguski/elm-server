@@ -236,6 +236,13 @@ containsParam name request =
     List.any (\(key, value) -> key == name) request.queryParams
 
 
+getParam : String -> Request -> Maybe String
+getParam name request =
+    List.filter (\(key, value) -> key == name) request.queryParams
+    |> List.head
+    |> Maybe.map (\(key, value) -> value)
+
+
 type alias Model =
     Dict String Request
 
