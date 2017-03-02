@@ -487,15 +487,17 @@ initRound seed users =
             , winner = Nothing
             }
     -- set actual player by seeking MahJong
-    |> (\round ->
-        { round | actualPlayer =
-            List.indexedMap (,) round.players
-            |> List.foldl (\(i, user) before ->
-                choose (hasCard MahJong user) (Just i) before
-            ) Nothing
-            |> Maybe.withDefault 0
-        }
-    )
+    |> setMahjongOwnerAsActualPlayer
+
+
+setMahjongOwnerAsActualPlayer round =
+    { round | actualPlayer =
+        List.indexedMap (,) round.players
+        |> List.foldl (\(i, user) before ->
+            choose (hasCard MahJong user) (Just i) before
+        ) Nothing
+        |> Maybe.withDefault 0
+    }
 
 
 initPlayer : List Card -> String -> Int -> Player
