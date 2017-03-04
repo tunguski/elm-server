@@ -278,7 +278,7 @@ gamePostRequest m idTable =
         |> List.indexedMap (,)
         |> List.filter (\(i, player) -> not player.human)
         |> List.map (\(i, player) ->
-            Process.sleep (toFloat <| 50 * i)
+            Process.sleep (toFloat <| 250 * i)
             |> andThen (\_ -> get idTable games)
             |> andThen (
                 tableChanged player.name
