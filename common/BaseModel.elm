@@ -48,6 +48,32 @@ encode encoder item =
     JE.encode 0 <| encoder item
 
 
+longInt =
+    oneOf
+      [ int
+      , field "$numberLong" (andThen (\s ->
+            case String.toInt s of
+                Ok f ->
+                    succeed f
+                Err err ->
+                    fail err
+        ) string)
+      ]
+
+
+longFloat =
+    oneOf
+      [ float
+      , field "$numberLong" (andThen (\s ->
+            case String.toFloat s of
+                Ok f ->
+                    succeed f
+                Err err ->
+                    fail err
+        ) string)
+      ]
+
+
 maybeEncodeDate maybe =
     case maybe of
         Just date ->

@@ -38,7 +38,7 @@ gameDecoder =
         (field "name" string)
         (field "config" gameConfigDecoder)
         (field "test" bool)
-        (field "seed" int)
+        (field "seed" longInt)
         (field "users" <| list gameUser)
         (field "round" round)
         (field "history" <| list round)
@@ -59,7 +59,7 @@ round =
         (field "tableHandOwner" (maybe int))
         (field "demand" (maybe rank))
         (field "demandCompleted" bool)
-        (field "seed" int)
+        (field "seed" longInt)
         (field "winner" (maybe int))
 
 
@@ -67,7 +67,7 @@ gameUser : Decoder GameUser
 gameUser =
     Json.map3 GameUser
         (field "name" string)
-        (field "lastCheck" float)
+        (field "lastCheck" longFloat)
         (field "human" bool)
 
 
@@ -363,12 +363,12 @@ awaitingTableDecoder =
             list
                 (map4 AwaitingTableUser
                     (field "name" string)
-                    (field "lastCheck" float)
+                    (field "lastCheck" longFloat)
                     (field "pressedStart" bool)
                     (field "human" bool))
         )
         (field "test" bool)
-        (field "seed" int)
+        (field "seed" longInt)
 
 
 awaitingTableEncoder : AwaitingTable -> Value

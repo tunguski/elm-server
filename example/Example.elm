@@ -65,7 +65,7 @@ processTaskWithError errorProcessor eval task =
         |> Command
 
 
-processTask : (item -> Task x Response) -> Task x item -> Partial Msg
+processTask : (item -> Task Error Response) -> Task Error item -> Partial Msg
 processTask eval task =
     processTaskWithError
         (\error ->
@@ -76,8 +76,17 @@ processTask eval task =
                 SendResponse (statusResponse 500)
         )
         eval
-        task
-
+        (task |> Task.onError (\error ->
+            case error of
+                BadStatus response ->
+                    case response.status.code == 500 of
+                        True ->
+                            Debug.log "!!!! Duplicate task execution" task
+                        False ->
+                            Task.fail error
+                _ ->
+                    Task.fail error
+        ))
 
 requiredTables =
     [ collectionUrl sessions

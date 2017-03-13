@@ -65,12 +65,17 @@ testGame api name =
     |> Command
 
 
+getGameWithRetry id =
+    get id games
+    |> onError (\e -> get id games |> Debug.log "http error!")
+
+
 doWithTable : (Session -> Game -> Round -> Player -> Task Error Response) ->
               ApiPartApi msg -> String ->
               Partial msg
 doWithTable function api id =
     api.doWithSession (\session ->
-        get id games
+        getGameWithRetry id
         |> andThen (\table ->
             function session table table.round
                 (getPlayer table.round session.username)
@@ -189,7 +194,7 @@ getGame api id =
         (\session ->
             let
                 getAndReturnIfChanged =
-                    get id games
+                    getGameWithRetry id
                     |> andThen
                         (\table ->
                             put id
@@ -272,14 +277,14 @@ gamePostRequest : (Result String (Maybe (Cmd msg)) -> msg) ->
                   String ->
                   Maybe (Cmd msg)
 gamePostRequest m idTable =
-    get idTable games
+    getGameWithRetry idTable
     |> andThen (\table ->
         table.users
         |> List.indexedMap (,)
         |> List.filter (\(i, player) -> not player.human)
         |> List.map (\(i, player) ->
             Process.sleep (toFloat <| 250 * i)
-            |> andThen (\_ -> get idTable games)
+            |> andThen (\_ -> getGameWithRetry idTable)
             |> andThen (
                 tableChanged player.name
                 >> Maybe.withDefault (Task.succeed "no move")

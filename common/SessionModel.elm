@@ -20,8 +20,8 @@ sessionDecoder =
     Json.map5 Session
         (field "username" string)
         (field "token" string)
-        (map dateParser <| field "loginTime" float)
-        (map dateParser <| field "lastRequestTime" float)
+        (map dateParser <| field "loginTime" longFloat)
+        (map dateParser <| field "lastRequestTime" longFloat)
         (field "idUser" string)
 
 
