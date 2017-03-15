@@ -67,7 +67,7 @@ testGame api name =
 
 getGameWithRetry id =
     get id games
-    |> onError (\e -> get id games |> Debug.log "http error!")
+    |> onError (\e -> get id games |> Debug.log "GET game retry")
 
 
 doWithTable : (Session -> Game -> Round -> Player -> Task Error Response) ->
@@ -284,10 +284,17 @@ gamePostRequest m idTable =
         |> List.filter (\(i, player) -> not player.human)
         |> List.map (\(i, player) ->
             Process.sleep (toFloat <| 250 * i)
-            |> andThen (\_ -> getGameWithRetry idTable)
-            |> andThen (
-                tableChanged player.name
-                >> Maybe.withDefault (Task.succeed "no move")
+            |> andThen (\_ ->
+                let
+                    move =
+                        getGameWithRetry idTable
+                        |> andThen (
+                            tableChanged player.name
+                            >> Maybe.withDefault (Task.succeed "no move")
+                        )
+                in
+                    move
+                    |> onError (\e -> move |> Debug.log "Bot move retry")
             )
         )
         |> Task.sequence

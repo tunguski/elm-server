@@ -115,6 +115,7 @@ get : String -> Rest item -> Task Error item
 get itemId rest =
   baseQuery rest (\config ->
     subResource itemId)
+  |> Task.mapError (Debug.log "Error during GET")
 
 
 findAll : Rest item -> Task Error (List item)
@@ -150,6 +151,7 @@ put itemId item rest =
         >> withJsonBody (config.encoder item)
         >> HttpBuilder.withHeader "Content-Type" "application/json"
         >> withExpect Http.expectString)
+    |> Task.mapError (Debug.log "Error during PUT")
 
 
 delete : String -> Rest item -> Task Error String

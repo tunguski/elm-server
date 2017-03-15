@@ -71,7 +71,7 @@ processTask eval task =
         (\error ->
             let
                 debug =
-                    Debug.log "error" error
+                    Debug.log "Task processing failed" error
             in
                 SendResponse (statusResponse 500)
         )
@@ -79,13 +79,15 @@ processTask eval task =
         (task |> Task.onError (\error ->
             case error of
                 BadStatus response ->
-                    case response.status.code == 500 of
-                        True ->
-                            Debug.log "!!!! Duplicate task execution" task
-                        False ->
-                            Task.fail error
+                    case response.status.code of
+                        404 ->
+                            Debug.log "!!!! Duplicate task execution on 404" task
+                        500 ->
+                            Debug.log "!!!! Duplicate task execution on 500" task
+                        _ ->
+                            Task.fail <| Debug.log "!!!! Other fail" error
                 _ ->
-                    Task.fail error
+                    Task.fail <| Debug.log "!!!! Other fail" error
         ))
 
 requiredTables =

@@ -58,6 +58,13 @@ longInt =
                 Err err ->
                     fail err
         ) string)
+      , string |> andThen (\s ->
+            case String.toInt s of
+                Ok f ->
+                    succeed f
+                Err err ->
+                    fail err
+        )
       ]
 
 

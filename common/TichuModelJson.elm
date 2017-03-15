@@ -217,7 +217,7 @@ gameEncoder game =
         [ ( "name", JE.string game.name )
         , ( "config", gameConfigEncoder game.config )
         , ( "test", JE.bool game.test )
-        , ( "seed", JE.int game.seed )
+        , ( "seed", JE.string <| toString game.seed )
         , ( "users"
           , JE.list (List.map gameUserEncoder game.users)
           )
@@ -328,7 +328,7 @@ roundEncoder round =
         , ( "tableHandOwner", maybeEncoder round.tableHandOwner JE.int )
         , ( "demand", maybeEncoder round.demand rankEncoder )
         , ( "demandCompleted", JE.bool round.demandCompleted )
-        , ( "seed", JE.int round.seed )
+        , ( "seed", JE.string <| toString round.seed )
         , ( "winner", maybeEncoder round.winner JE.int )
         ]
 
@@ -376,7 +376,7 @@ awaitingTableEncoder table =
     JE.object
         [ ( "name", JE.string table.name )
         , ( "config", gameConfigEncoder table.config )
-        , ( "seed", JE.int table.seed )
+        , ( "seed", JE.string <| toString table.seed )
         , ( "users"
           , JE.list
                 (List.map (\user ->

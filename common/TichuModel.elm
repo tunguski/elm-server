@@ -852,7 +852,10 @@ exchangeCardsBetweenPlayers table =
                 ) <| Array.toList players
             }
     )
-    |> (\round -> { table | round = round })
+    |> (\round -> { table | round =
+        setMahjongOwnerAsActualPlayer round
+    })
+
 
 
 choose condition true false =
