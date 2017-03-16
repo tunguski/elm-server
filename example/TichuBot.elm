@@ -27,8 +27,12 @@ tableChanged botName game =
         player = getPlayer game.round botName
         param = buildHandParams botName game game.round player []
     in
-        botMove botName game game.round player actualPlayer param
-        |> Maybe.map (processingResultToTask >> map toString)
+        case roundFinished game.round of
+            False ->
+                botMove botName game game.round player actualPlayer param
+                |> Maybe.map (processingResultToTask >> map toString)
+            True ->
+                Nothing
 
 
 {-| Maybe make bot's move. Returned task describes what bot want's to do.

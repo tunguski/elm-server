@@ -290,13 +290,32 @@ four cards =
 
 {-| Is combination allowed to be placed on table. There may be previous trick on table.
 -}
-allowedCombination : Maybe Cards -> Cards -> Bool
+allowedCombination : List Cards -> Cards -> Bool
 allowedCombination table combination =
     (case parseTrick combination of
         Just trick ->
-            case Maybe.andThen parseTrick table of
+            case Maybe.andThen parseTrick (List.head table) of
                 Just trickOnTable ->
-                    isSameTrickAndStronger trick trickOnTable
+                    -- if playing single card on single phoenix, his weight is calculated differently
+                    case (List.head table, combination) of
+                        (Just [ Phoenix ], [ c ]) ->
+                            let
+                                phoenixRank =
+                                    table
+                                    -- leave phoenix
+                                    |> List.drop 1
+                                    -- get next combination from table
+                                    |> List.head
+                                    -- get first card from combination
+                                    |> Maybe.andThen List.head
+                                    -- count it weight
+                                    |> Maybe.map cardWeight
+                                    -- if there is no combination below phoenix, count as lowest
+                                    |> Maybe.withDefault 1
+                            in
+                                phoenixRank < cardWeight c
+                        _ ->
+                            isSameTrickAndStronger trick trickOnTable
                 Nothing ->
                     True
         Nothing ->
@@ -726,16 +745,19 @@ updatePlayerPlayingHand player param =
         })
 
 
-maybeEndRound table =
-    table.round.players
+roundFinished : Round -> Bool
+roundFinished round =
+    round.players
     |> List.filter (.hand >> List.isEmpty >> not)
     |> List.length
-    |> (\activePlayers ->
-        if (activePlayers == 1) then
-            nextRound table
-        else
-            table
-    )
+    |> (==) 1
+
+
+maybeEndRound : Game -> Game
+maybeEndRound table =
+    case roundFinished table.round of
+        True -> nextRound table
+        False -> table
 
 
 modifyNthPlayer i modifier round =

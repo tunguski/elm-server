@@ -292,9 +292,10 @@ gamePostRequest m idTable =
                             tableChanged player.name
                             >> Maybe.withDefault (Task.succeed "no move")
                         )
+                    -- possible infinite recursion
+                    rec = \t -> t |> onError (\e -> rec move |> Debug.log "Bot move retry")
                 in
-                    move
-                    |> onError (\e -> move |> Debug.log "Bot move retry")
+                    rec move
             )
         )
         |> Task.sequence
