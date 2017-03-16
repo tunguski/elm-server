@@ -712,7 +712,7 @@ nextRound table =
             |> Debug.log "end of game!"
         else
             { table
-            | round = initRound ((table.round.seed + 19) * 263) table.users
+            | round = initRound (((table.round.seed + 19) * 263) % 9007199254740990) table.users
             , history = history
             }
             |> Debug.log "end of round!"
