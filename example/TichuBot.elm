@@ -99,30 +99,52 @@ botMove botName game round player actualPlayer param =
                     |> Debug.log "mahjong"
 
                 False ->
-                    case List.head game.round.table of
-                        Nothing ->
-                            List.head player.hand
-                            |> Maybe.andThen (List.singleton >> playHand)
-                            |> Debug.log "lowest card"
+                    let
+                        higherCards =
+                            case List.head game.round.table of
+                                Just [ card ] ->
+                                    player.hand
+                                    |> List.filter (\c -> cardWeight c > cardWeight card)
+                                _ ->
+                                    player.hand
+                        normalProcess x =
+                            case List.head game.round.table of
+                                Nothing ->
+                                    List.head player.hand
+                                    |> Maybe.andThen (List.singleton >> playHand)
+                                    |> Debug.log "lowest card"
 
-                        Just [ card ] ->
-                            player.hand
-                            |> List.filter (\c -> cardWeight c > cardWeight card)
-                            |> List.head
-                            |> Maybe.map (Debug.log "higher card")
-                            |> Maybe.andThen (
-                                List.singleton
-                                >> playHand
-                            )
-                            |> Maybe.withDefault (
-                                pass botName game round player
-                                |> Debug.log "pass"
-                            )
-                            |> Just
-                        _ ->
-                            pass botName game round player
-                            |> Just
-                            |> Debug.log "pass"
+                                Just [ card ] ->
+                                    higherCards
+                                    |> List.head
+                                    |> Maybe.map (Debug.log "higher card")
+                                    |> Maybe.andThen (
+                                        List.singleton
+                                        >> playHand
+                                    )
+                                    |> Maybe.withDefault (
+                                        pass botName game round player
+                                        |> Debug.log "pass"
+                                    )
+                                    |> Just
+                                _ ->
+                                    pass botName game round player
+                                    |> Just
+                                    |> Debug.log "pass"
+                    in
+                        case (round.demand, round.demandCompleted) of
+                            (Just rank, False) ->
+                                higherCards
+                                |> List.filter (\c ->
+                                    rankWeight rank == cardWeight c
+                                )
+                                |> List.head
+                                |> Maybe.map (\c ->
+                                    playHand [ c ]
+                                )
+                                |> Maybe.withDefault (normalProcess ())
+                            _ ->
+                                normalProcess ()
     )
     |> executeIf (False) (\_ ->
         Nothing
