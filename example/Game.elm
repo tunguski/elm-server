@@ -46,6 +46,7 @@ gamesApiPart api =
             , PF "declareGrandTichu" (\() -> declareGrandTichu api id)
             , PF "pass" (\() -> pass api id)
             , PF "hand" (\() -> hand api id)
+            , PF "demandRank" (\() -> demandRank api id)
             , PF "giveDragon" (\() -> giveDragon api id)
             , PF "testGame" (\() -> testGame api id)
             ]
@@ -262,6 +263,20 @@ getGame api id =
                 getAndReturnIfChanged
             |> onError logErrorAndReturn
         )
+
+
+demandRank : ApiPartApi msg -> String -> Partial msg
+demandRank api =
+    doWithTable (\session table round player ->
+        case decodeString rank api.request.body of
+            Ok rank ->
+                TichuLogic.demandRank session.username
+                    table round player rank
+                |> processingResultToTask
+            Err error ->
+                response 400 "Could not understand demanded rank"
+                |> Task.succeed
+    ) api
 
 
 giveDragon : ApiPartApi msg -> String -> Partial msg

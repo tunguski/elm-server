@@ -124,7 +124,9 @@ hand userName table round player cards =
 buildHandParams userName table round player cards =
     { isActualPlayer = (getActualPlayer round).name == userName
     , isOpenDemand = openDemand round
-    , hasDemandedCard = openDemandMatch round
+    , hasDemandedCard =
+        (not <| hasCard MahJong player)
+        && openDemandMatch round
     , parsedCards = cards
     , trick = parseTrick cards
     , allowedTrick = allowedCombination round.table cards
@@ -175,8 +177,9 @@ pass userName table round player =
     Nothing
     |> orElse player.sawAllCards "Before playing you have to decide playing Grand Tichu or not"
     |> orElse ((getActualPlayer round).name == userName) "Not an actual player"
-    |> orElse (not <| openDemandMatch round) "You have demanded card"
     |> orElse (not <| hasCard MahJong player) "You have MahJong"
+    |> orElse (hasCard MahJong player
+               || (not <| openDemandMatch round)) "You have demanded card"
     |> orElse (not <| isNothing round.tableHandOwner) "You cannot pass if you won last table"
     |> executeIfNoError (
         -- switch to next player and return ok
@@ -280,6 +283,18 @@ seeAllCards userName table round player =
         (.sawAllCards >> not)
         (\player -> { player | sawAllCards = True })
         userName table round player
+
+
+demandRank userName table round player rank =
+    Nothing
+    |> orElse ((getActualPlayer round).name == userName) "Not an actual player"
+    |> orElse (hasCard MahJong player) "You don't have MahJong"
+    |> executeIfNoError (
+        put table.name
+            { table | round = { round | demand = Just rank } }
+            games
+        |> okSucceed
+    )
 
 
 giveDragon userName table round player giveToNext =

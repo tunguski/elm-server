@@ -76,8 +76,12 @@ cardsDecoder =
     list card
 
 
+decodeCards : String -> Result String Cards
 decodeCards =
     decodeString cardsDecoder
+
+
+decodeString = Json.decodeString
 
 
 card : Decoder Card
@@ -278,7 +282,7 @@ cardEncoder card =
 
 encodeCards : Cards -> String
 encodeCards cards =
-    encode JE.list (List.map cardEncoder cards)
+    JE.encode 0 <| JE.list (List.map cardEncoder cards)
 
 
 rankEncoder : Rank -> Value
