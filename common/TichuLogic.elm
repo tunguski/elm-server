@@ -318,7 +318,12 @@ giveDragon userName table round player giveToNext =
         in
             -- switch to next player and return ok
             put table.name
-                { table | round = giveDragonTo index round }
+                { table
+                | round =
+                    round
+                    |> giveDragonTo index
+                    |> maybeIncActualPlayer
+                }
                 games
             |> okSucceed
     )
