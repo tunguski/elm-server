@@ -110,12 +110,19 @@ withMethod method builder =
 subResource name builder =
     { builder | url = builder.url ++ "/" ++ name }
 
+logError method =
+    Task.mapError (\error ->
+        let
+            log = Debug.log "Error during" method
+        in
+            error
+    )
+
 
 get : String -> Rest item -> Task Error item
 get itemId rest =
-  baseQuery rest (\config ->
-    subResource itemId)
-  |> Task.mapError (Debug.log "Error during GET")
+    baseQuery rest (\config -> subResource itemId)
+    |> logError "GET"
 
 
 findAll : Rest item -> Task Error (List item)
@@ -151,7 +158,7 @@ put itemId item rest =
         >> withJsonBody (config.encoder item)
         >> HttpBuilder.withHeader "Content-Type" "application/json"
         >> withExpect Http.expectString)
-    |> Task.mapError (Debug.log "Error during PUT")
+    |> logError "PUT"
 
 
 delete : String -> Rest item -> Task Error String
