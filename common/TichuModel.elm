@@ -58,6 +58,16 @@ rankWeight rank =
         A -> 14
 
 
+weightToRank : Int -> Rank
+weightToRank weight =
+    case weight of
+        11 -> J
+        12 -> Q
+        13 -> K
+        14 -> A
+        _ -> R weight
+
+
 cardWeight : Card -> Int
 cardWeight card =
     case card of
@@ -88,7 +98,7 @@ type
       -- three's rank
     | FullHouse Rank
       -- lowest, length
-    | Straight Int Int
+    | Straight Rank Int
     | Three Rank
       -- lowest, length
     | PairStairs Rank Int
@@ -106,7 +116,7 @@ isSameTrickAndStronger c1 c2 =
         (Pair r1, Pair r2) -> rankWeight r1 > rankWeight r2
         (PairStairs b1 i1, PairStairs b2 i2) -> i1 == i2 && rankWeight b1 > rankWeight b2
         (Three r1, Three r2) -> rankWeight r1 > rankWeight r2
-        (Straight r1 i1, Straight r2 i2) -> i1 == i2 && r1 > r2
+        (Straight r1 i1, Straight r2 i2) -> i1 == i2 && rankWeight r1 > rankWeight r2
         (FullHouse r1, FullHouse r2) -> rankWeight r1 > rankWeight r2
         _ -> False
 
@@ -228,7 +238,7 @@ straight cards =
                         False -> Nothing
                 [] ->
                     case length >= 5 of
-                        True -> Just (Straight last length)
+                        True -> Just (Straight (weightToRank last) length)
                         False -> Nothing
                 _ ->
                     Nothing
