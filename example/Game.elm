@@ -253,8 +253,18 @@ getGame api id =
                                             if t /= toString gameHash then
                                                 gameResponse
                                             else
-                                                Process.sleep 500.0
-                                                |> andThen (\_ -> getAndReturnIfChanged)
+                                                Task.map2 (,)
+                                                (Process.sleep 500.0)
+                                                Time.now
+                                                |> andThen (\(_, time) ->
+                                                    if api.request.time + 5000 < time then
+                                                        let
+                                                            log = Debug.log "Returning response without change after " time
+                                                        in
+                                                            gameResponse
+                                                    else
+                                                        getAndReturnIfChanged
+                                                )
                                         Nothing ->
                                             gameResponse
                                     )
