@@ -9,19 +9,11 @@ cache:
     - elm-stuff/build-artifacts
 
 before_script:
-  - npm install
-  - git clone https://github.com/tunguski/elm-spa-example.git client
-  - elm-make --yes example/Example.elm --output main.js
-  - node server.js &
-  - sleep 2
-  - ps auxwf | grep node
+  - bash tests/before_script.sh
 
 script:
-  - echo "Start script"
-  - ps auxwf | grep node
-  - for i in $(seq 1 10); do curl http://localhost:8080 | tee "$i.log" ; done
-  - sleep 10
-  - for i in $(seq 1 10); do grep -Fxq "/$i" "$i.log" || ( echo "File $i.log contains improper data"; cat "$i.log"; ) ; done
+  - bash tests/basic_test.sh
+
 notifications:
     email: false
 
