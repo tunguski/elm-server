@@ -10,5 +10,3 @@ node server.js &
 
 sleep 2
 
-ps auxwf | grep node
-
