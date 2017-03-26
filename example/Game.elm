@@ -258,10 +258,7 @@ getGame api id =
                                                 Time.now
                                                 |> andThen (\(_, time) ->
                                                     if api.request.time + 5000 < time then
-                                                        let
-                                                            log = Debug.log "Returning response without change after " time
-                                                        in
-                                                            gameResponse
+                                                        gameResponse
                                                     else
                                                         getAndReturnIfChanged
                                                 )
