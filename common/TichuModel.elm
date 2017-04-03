@@ -515,8 +515,6 @@ initRound seed users =
             , seed = seed
             , winner = Nothing
             }
-    -- set actual player by seeking MahJong
-    |> setMahjongOwnerAsActualPlayer
 
 
 setMahjongOwnerAsActualPlayer round =
