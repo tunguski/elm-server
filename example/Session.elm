@@ -53,7 +53,7 @@ getGuestSession :
 getGuestSession api withSessionMaybe =
     (case containsParam "forceNew" api.request of
         True ->
-            fail (BadStatus (fakeResponse 404)) 
+            fail (BadStatus (fakeResponse 404))
         False ->
             executeIfIdSessionExists api.request (\id -> get id sessions)
     )
@@ -87,8 +87,14 @@ processGetSessionError request error =
             |> andThen (\token ->
                let
                    newSession =
-                       Session token token (Date.fromTime request.time)
-                           (Date.fromTime request.time) token
+                       Session
+                            (case getParam "name" request of
+                                Just name -> name
+                                _ -> token)
+                            token
+                            (Date.fromTime request.time)
+                            (Date.fromTime request.time)
+                            token
                in
                    put token newSession sessions
                    |> andThen (\s ->
