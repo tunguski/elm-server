@@ -113,7 +113,7 @@ subResource name builder =
 logError method =
     Task.mapError (\error ->
         let
-            log = Debug.log "Error during" method
+            log = Debug.log ("Error during " ++ method) error
         in
             error
     )
