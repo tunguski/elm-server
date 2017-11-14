@@ -5,8 +5,6 @@
     "license": "BSD-3-Clause",
     "source-directories": [
         "src",
-        "example",
-        "common",
         "client"
     ],
     "exposed-modules": [],
