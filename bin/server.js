@@ -17,8 +17,8 @@ const requestCache = {};
 const proxy = httpProxy.createProxyServer();
 
 function startElmServer() {
-  delete require.cache[require.resolve('./main')]
-  var elm = require('./main');
+  delete require.cache[require.resolve('./target/server')]
+  var elm = require('./target/main');
   app = elm.Example.worker();
 
 
@@ -169,10 +169,10 @@ function elmBuilder (paths, cmd, postBuild) {
 }
 
 
-const clientBuilder = elmBuilder(['client/'],
-    'elm-make client/Main.elm     --output public/example.js');
-const serverBuilder = elmBuilder(['src/', 'example/'],
-    'elm-make example/Example.elm --output main.js',
+const clientBuilder = elmBuilder(['src/'],
+    'elm-make srv/Client.elm --output public/client.js');
+const serverBuilder = elmBuilder(['src/'],
+    'elm-make srv/Server.elm --output target/server.js',
     startElmServer);
 
 
