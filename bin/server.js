@@ -6,6 +6,10 @@ const url = require('url');
 
 
 global.XMLHttpRequest = require("xhr2");
+const moduleBase = process.cwd() + "/target";
+
+
+console.log('Working directory: ' + moduleBase);
 
 
 var app;
@@ -17,9 +21,9 @@ const requestCache = {};
 const proxy = httpProxy.createProxyServer();
 
 function startElmServer() {
-  delete require.cache[require.resolve('./target/server')]
-  var elm = require('./target/main');
-  app = elm.Example.worker();
+  delete require.cache[require.resolve(moduleBase + '/server_main')]
+  var elm = require(moduleBase + '/server_main');
+  app = elm.ServerMain.worker();
 
 
   app.ports.sendResponsePort.subscribe(function(response) {
@@ -170,9 +174,9 @@ function elmBuilder (paths, cmd, postBuild) {
 
 
 const clientBuilder = elmBuilder(['src/'],
-    'elm-make srv/Client.elm --output public/client.js');
+    'elm-make client/ClientMain.elm --output public/client.js');
 const serverBuilder = elmBuilder(['src/'],
-    'elm-make srv/Server.elm --output target/server.js',
+    'elm-make src/ServerMain.elm --output server_main.js',
     startElmServer);
 
 
