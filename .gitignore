@@ -1,5 +1,7 @@
 *.swp
 *.log
+.project
+.classpath
 npm-debug.log
 main.js
 public/example.js

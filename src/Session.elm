@@ -1,18 +1,16 @@
 module Session exposing (sessionApiPart)
 
+import ApiPartApi exposing (..)
+import BaseModel exposing (..)
 import Date
 import Dict
-import Task exposing (..)
-import Http exposing (Error(..))
-
-
-import ApiPartApi exposing (..)
-import RandomTask exposing (..)
-import BaseModel exposing (..)
 import ExampleDb exposing (..)
+import Http exposing (Error(..))
+import RandomTask exposing (..)
+import Rest exposing (..)
 import Server exposing (..)
 import SessionModel exposing (..)
-import Rest exposing (..)
+import Task exposing (..)
 import UrlParse exposing (..)
 import UserModel exposing (..)
 
@@ -34,9 +32,11 @@ sessionApiPart api withSessionMaybe =
                             BadStatus response ->
                                 case response.status.code of
                                     404 ->
-                                      api.sendResponse (statusResponse 404)
+                                        api.sendResponse (statusResponse 404)
+
                                     code ->
-                                      api.sendResponse (statusResponse code)
+                                        api.sendResponse (statusResponse code)
+
                             _ ->
                                 api.sendResponse (statusResponse 500)
                     )
@@ -54,56 +54,63 @@ getGuestSession api withSessionMaybe =
     (case containsParam "forceNew" api.request of
         True ->
             fail (BadStatus (fakeResponse 404))
+
         False ->
             executeIfIdSessionExists api.request (\id -> get id sessions)
     )
-    |> onError (processGetSessionError api.request)
-    |> Task.attempt (\result ->
-       case result of
-           Ok session ->
-               api.sendResponse <|
-                   case containsParam "noHeader" api.request of
-                       True ->
-                           (okResponse (encodeSession session))
-                       False ->
-                           (setCookie "Set-Cookie"
-                               ("SESSIONID=" ++ session.token ++ "; Path=/;")
-                               (okResponse (encodeSession session))
-                   )
-           Err error ->
-               let
-                   x =
-                       Debug.log "error" error
-               in
-                   api.sendResponse (statusResponse 500)
-    )
-    |> Command
+        |> onError (processGetSessionError api.request)
+        |> Task.attempt
+            (\result ->
+                case result of
+                    Ok session ->
+                        api.sendResponse <|
+                            case containsParam "noHeader" api.request of
+                                True ->
+                                    okResponse (encodeSession session)
+
+                                False ->
+                                    setCookie "Set-Cookie"
+                                        ("SESSIONID=" ++ session.token ++ "; Path=/;")
+                                        (okResponse (encodeSession session))
+
+                    Err error ->
+                        let
+                            x =
+                                Debug.log "error" error
+                        in
+                        api.sendResponse (statusResponse 500)
+            )
+        |> Command
 
 
 processGetSessionError request error =
     case error of
         BadStatus response ->
             RandomTask.randomIdentifier
-            |> andThen (\token ->
-               let
-                   newSession =
-                       Session
-                            (case getParam "name" request of
-                                Just name -> name
-                                _ -> token)
-                            token
-                            (Date.fromTime request.time)
-                            (Date.fromTime request.time)
-                            token
-               in
-                   put token newSession sessions
-                   |> andThen (\s ->
-                       put token (User token token "guest" token 1500) users
-                       |> andThenReturn (Task.succeed newSession)
-                   )
-            )
+                |> andThen
+                    (\token ->
+                        let
+                            newSession =
+                                Session
+                                    (case getParam "name" request of
+                                        Just name ->
+                                            name
+
+                                        _ ->
+                                            token
+                                    )
+                                    token
+                                    (Date.fromTime request.time)
+                                    (Date.fromTime request.time)
+                                    token
+                        in
+                        put token newSession sessions
+                            |> andThen
+                                (\s ->
+                                    put token (User token token "guest" token 1500) users
+                                        |> andThenReturn (Task.succeed newSession)
+                                )
+                    )
 
         _ ->
             Task.fail error
-
-

@@ -1,16 +1,16 @@
-module SessionModel exposing (..)
+module SessionModel exposing (Session, encodeSession, sessionDecoder, sessionEncoder)
 
-import Date exposing (Date)
+import BaseModel exposing (..)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
-import BaseModel exposing (..)
+import Time exposing (Posix)
 
 
 type alias Session =
     { username : String
     , token : String
-    , loginTime : Date
-    , lastRequestTime : Date
+    , loginTime : Posix
+    , lastRequestTime : Posix
     , idUser : String
     }
 
@@ -20,8 +20,8 @@ sessionDecoder =
     Json.map5 Session
         (field "username" string)
         (field "token" string)
-        (map dateParser <| field "loginTime" longFloat)
-        (map dateParser <| field "lastRequestTime" longFloat)
+        (field "loginTime" longPosix)
+        (field "lastRequestTime" longPosix)
         (field "idUser" string)
 
 
@@ -30,8 +30,8 @@ sessionEncoder session =
     JE.object
         [ ( "username", JE.string session.username )
         , ( "token", JE.string session.token )
-        , ( "loginTime", JE.float <| Date.toTime session.loginTime )
-        , ( "lastRequestTime", JE.float <| Date.toTime session.lastRequestTime )
+        , ( "loginTime", JE.int <| Time.posixToMillis session.loginTime )
+        , ( "lastRequestTime", JE.int <| Time.posixToMillis session.lastRequestTime )
         , ( "idUser", JE.string session.idUser )
         ]
 
@@ -39,5 +39,3 @@ sessionEncoder session =
 encodeSession : Session -> String
 encodeSession session =
     JE.encode 0 <| sessionEncoder session
-
-

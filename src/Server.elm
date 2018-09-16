@@ -1,8 +1,8 @@
-port module Server exposing (..)
+port module Server exposing (Initializer, Model, Partial(..), PortRequest, PortResponse, PostRequestUpdater, Request, RequestMethod(..), Response, ServerMsg(..), Updater, baseRequest, containsParam, executeIfIdSessionExists, fakeResponse, getCookies, getHeader, getHeaderDefault, getIdSession, getParam, logErrorAndReturn, okResponse, parseRequest, parseRequestMethod, program, request, response, sendResponse, sendResponsePort, setCookie, statusResponse, subscriptions, update, x_test_session)
 
 import Dict exposing (Dict, empty)
-import Maybe
 import Http exposing (Error(..))
+import Maybe
 import Platform exposing (program)
 import String
 import Task
@@ -13,6 +13,7 @@ type Partial msg
     = Result Response
     | Command (Cmd msg)
     | Noop
+
 
 
 -- -- generic state of request processing
@@ -32,20 +33,23 @@ type alias PostRequestUpdater msg =
     Request -> Maybe (Cmd msg)
 
 
+
 -- -- helper function that modifies state according to message
 -- type alias StateUpdater msg state = State msg state -> State msg state
 
 
-program : Initializer msg ->
-          Updater msg ->
-          PostRequestUpdater msg ->
-          Program Never (Dict String Request) (ServerMsg msg)
+program :
+    Initializer msg
+    -> Updater msg
+    -> PostRequestUpdater msg
+    -> Program Never (Dict String Request) (ServerMsg msg)
 program initializer updater postRequestUpdater =
     Platform.program
         { init = ( empty, Cmd.none )
         , update = update initializer updater postRequestUpdater
         , subscriptions = subscriptions
         }
+
 
 
 -- MODEL
@@ -101,14 +105,20 @@ parseRequest r =
     case parseRequestMethod r.method of
         Just method ->
             let
-                request = baseRequest r
+                request =
+                    baseRequest r
             in
-                Just { request
-                     | method = method
-                     , idSession = getIdSession request
-                     , test = getHeaderDefault "X-Test-Session"
-                                (\_ -> True) False request
-                     }
+            Just
+                { request
+                    | method = method
+                    , idSession = getIdSession request
+                    , test =
+                        getHeaderDefault "X-Test-Session"
+                            (\_ -> True)
+                            False
+                            request
+                }
+
         Nothing ->
             Nothing
 
@@ -147,6 +157,7 @@ logErrorAndReturn error =
     case Debug.log "error" error of
         BadStatus r ->
             statusResponse r.status.code |> Task.succeed
+
         _ ->
             statusResponse 500 |> Task.succeed
 
@@ -154,12 +165,23 @@ logErrorAndReturn error =
 parseRequestMethod : String -> Maybe RequestMethod
 parseRequestMethod method =
     case String.toLower method of
-        "get" ->    Just Get
-        "post" ->   Just Post
-        "put" ->    Just Put
-        "patch" ->  Just Patch
-        "delete" -> Just Delete
-        _ -> Nothing
+        "get" ->
+            Just Get
+
+        "post" ->
+            Just Post
+
+        "put" ->
+            Just Put
+
+        "patch" ->
+            Just Patch
+
+        "delete" ->
+            Just Delete
+
+        _ ->
+            Nothing
 
 
 getCookies : Request -> Dict String String
@@ -176,18 +198,19 @@ getCookies request =
         splitCookies cookie =
             String.split ";" cookie
     in
-        case getHeader "cookie" request of
-            Just cookies ->
-                splitCookies cookies
-                    |> List.map extractCookie
-                    |> List.filterMap identity
-                    |> Dict.fromList
+    case getHeader "cookie" request of
+        Just cookies ->
+            splitCookies cookies
+                |> List.map extractCookie
+                |> List.filterMap identity
+                |> Dict.fromList
 
-            Nothing ->
-                Dict.empty
+        Nothing ->
+            Dict.empty
 
 
-x_test_session = "X-Test-Session"
+x_test_session =
+    "X-Test-Session"
 
 
 getIdSession : Request -> Maybe String
@@ -195,6 +218,7 @@ getIdSession request =
     case getHeader x_test_session request of
         Just id ->
             Just id
+
         Nothing ->
             Dict.get "SESSIONID" <| getCookies request
 
@@ -208,6 +232,7 @@ executeIfIdSessionExists request task =
     case request.idSession of
         Just id ->
             task id
+
         Nothing ->
             Task.fail (BadStatus (fakeResponse 404))
 
@@ -215,13 +240,13 @@ executeIfIdSessionExists request task =
 getHeaderDefault : String -> (String -> a) -> a -> Request -> a
 getHeaderDefault key mapper default request =
     getHeader key request
-    |> Maybe.map mapper
-    |> Maybe.withDefault default
+        |> Maybe.map mapper
+        |> Maybe.withDefault default
 
 
 getHeader : String -> Request -> Maybe String
 getHeader key request =
-    List.filter (\( headerKey, value ) -> headerKey == (String.toLower key)) request.headers
+    List.filter (\( headerKey, value ) -> headerKey == String.toLower key) request.headers
         |> List.head
         |> Maybe.map (\( k, v ) -> v)
 
@@ -233,18 +258,19 @@ setCookie name value response =
 
 containsParam : String -> Request -> Bool
 containsParam name request =
-    List.any (\(key, value) -> key == name) request.queryParams
+    List.any (\( key, value ) -> key == name) request.queryParams
 
 
 getParam : String -> Request -> Maybe String
 getParam name request =
-    List.filter (\(key, value) -> key == name) request.queryParams
-    |> List.head
-    |> Maybe.map (\(key, value) -> value)
+    List.filter (\( key, value ) -> key == name) request.queryParams
+        |> List.head
+        |> Maybe.map (\( key, value ) -> value)
 
 
 type alias Model =
     Dict String Request
+
 
 
 -- UPDATE
@@ -281,21 +307,32 @@ update initializer updater postRequestUpdater msg model =
                         Result response ->
                             case postRequestUpdater request of
                                 Just msg ->
-                                    Dict.insert request.id request model !
+                                    ( Dict.insert request.id request model
+                                    , Cmd.batch
                                         [ sendResponse request response
                                         , Cmd.map (InternalPostRequestMsg request.id) msg
                                         ]
+                                    )
+
                                 Nothing ->
-                                    model ! [ sendResponse request response ]
+                                    ( model
+                                    , sendResponse request response
+                                    )
 
                         Command cmd ->
-                            Dict.insert request.id request model
-                                ! [ Cmd.map (InternalServerMsg request.id) cmd ]
+                            ( Dict.insert request.id request model
+                            , Cmd.map (InternalServerMsg request.id) cmd
+                            )
+
                         Noop ->
-                            model ! []
+                            ( model
+                            , Cmd.none
+                            )
 
                 Nothing ->
-                    model ! [ sendResponse (baseRequest r) (Response [] 400 "") ]
+                    ( model
+                    , sendResponse (baseRequest r) (Response [] 400 "")
+                    )
 
         InternalServerMsg idRequest internalMessage ->
             case Dict.get idRequest model of
@@ -304,42 +341,63 @@ update initializer updater postRequestUpdater msg model =
                         Result response ->
                             case postRequestUpdater request of
                                 Just msg ->
-                                    model !
+                                    ( model
+                                    , Cmd.batch
                                         [ sendResponse request response
                                         , Cmd.map (InternalPostRequestMsg request.id) msg
                                         ]
+                                    )
+
                                 Nothing ->
-                                    Dict.remove request.id model ! [ sendResponse request response ]
+                                    ( Dict.remove request.id model
+                                    , sendResponse request response
+                                    )
 
                         Command cmd ->
-                            model
-                                ! [ Cmd.map (InternalServerMsg idRequest) cmd ]
+                            ( model
+                            , Cmd.map (InternalServerMsg idRequest) cmd
+                            )
 
                         Noop ->
-                            model ! []
+                            ( model
+                            , Cmd.none
+                            )
 
                 Nothing ->
-                    Debug.log "Illegal state" <| model ! []
+                    Debug.log "Illegal state" <|
+                        ( model
+                        , Cmd.none
+                        )
 
         InternalPostRequestMsg idRequest postRequestMsg ->
             case Dict.get idRequest model of
                 Just request ->
                     case updater request postRequestMsg of
                         Result response ->
-                            Debug.log "Illegal state" <| model ! []
+                            Debug.log "Illegal state" <|
+                                ( model
+                                , Cmd.none
+                                )
 
                         Command cmd ->
-                            model
-                                ! [ Cmd.map (InternalServerMsg idRequest) cmd ]
+                            ( model
+                            , Cmd.map (InternalServerMsg idRequest) cmd
+                            )
 
                         Noop ->
-                            Dict.remove idRequest model ! []
+                            ( Dict.remove idRequest model
+                            , Cmd.none
+                            )
 
                 Nothing ->
-                    Debug.log "Illegal state" <| model ! []
+                    Debug.log "Illegal state" <|
+                        ( model
+                        , Cmd.none
+                        )
 
 
 port request : (PortRequest -> msg) -> Sub msg
+
 
 
 -- SUBSCRIPTIONS
@@ -348,5 +406,3 @@ port request : (PortRequest -> msg) -> Sub msg
 subscriptions : Model -> Sub (ServerMsg msg)
 subscriptions model =
     request IncomingRequest
-
-

@@ -34,35 +34,36 @@ internal parser input =
                 splitted =
                     String.split "/" input
             in
-                case splitted of
-                    -- first part is "" because url started of "/"
-                    _ :: h :: t ->
-                        chooseFirst (function h) ("/" ++ (String.join "/" t))
+            case splitted of
+                -- first part is "" because url started of "/"
+                _ :: h :: t ->
+                    chooseFirst (function h) ("/" ++ String.join "/" t)
 
-                    _ ->
-                        Err "No match found"
+                _ ->
+                    Err "No match found"
 
         I function ->
             let
                 splitted =
                     String.split "/" input
             in
-                case splitted of
-                    -- first part is "" because url started of "/"
-                    _ :: h :: t ->
-                        case String.toInt h of
-                            Ok int ->
-                                chooseFirst (function int) ("/" ++ (String.join "/" t))
+            case splitted of
+                -- first part is "" because url started of "/"
+                _ :: h :: t ->
+                    case String.toInt h of
+                        Ok int ->
+                            chooseFirst (function int) ("/" ++ String.join "/" t)
 
-                            Err err ->
-                                Err err
+                        Err err ->
+                            Err err
 
-                    _ ->
-                        Err "No match found"
+                _ ->
+                    Err "No match found"
 
         P path list ->
             if String.startsWith ("/" ++ path) input then
                 chooseFirst list (String.dropLeft (String.length path + 1) input)
+
             else
                 Err "no match found"
 

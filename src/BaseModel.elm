@@ -1,9 +1,9 @@
-module BaseModel exposing (..)
+module BaseModel exposing (Collection, collectionDecoder, encode, encodeCollection, listDecoder, listToValue, longFloat, longInt, longPosix, maybeEncodeDate)
 
-import Date exposing (Date, fromString, fromTime)
-import Result exposing (toMaybe)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
+import Result exposing (toMaybe)
+import Time exposing (Posix)
 
 
 type alias Collection item =
@@ -26,7 +26,7 @@ collectionDecoder itemDecoder =
                             succeed []
 
                         _ ->
-                            (at [ "_embedded", "rh:doc" ] <| Json.list itemDecoder)
+                            at [ "_embedded", "rh:doc" ] <| Json.list itemDecoder
                 )
         )
 
@@ -36,8 +36,9 @@ listDecoder =
     Json.list
 
 
-listToValue encoder list =
-    JE.list (List.map encoder list)
+listToValue : (item -> JE.Value) -> List item -> JE.Value
+listToValue =
+    JE.list
 
 
 encodeCollection encoder collection =
@@ -48,50 +49,35 @@ encode encoder item =
     JE.encode 0 <| encoder item
 
 
+parse parser value =
+    parser value
+        |> Maybe.map (\s -> succeed s)
+        |> Maybe.withDefault (fail value)
+
+
 longInt =
     oneOf
-      [ int
-      , field "$numberLong" (andThen (\s ->
-            case String.toInt s of
-                Ok f ->
-                    succeed f
-                Err err ->
-                    fail err
-        ) string)
-      , string |> andThen (\s ->
-            case String.toInt s of
-                Ok f ->
-                    succeed f
-                Err err ->
-                    fail err
-        )
-      ]
+        [ int
+        , field "$numberLong" (andThen (parse String.toInt) string)
+        , string |> andThen (parse String.toInt)
+        ]
+
+
+longPosix =
+    andThen (Time.millisToPosix >> succeed) int
 
 
 longFloat =
     oneOf
-      [ float
-      , field "$numberLong" (andThen (\s ->
-            case String.toFloat s of
-                Ok f ->
-                    succeed f
-                Err err ->
-                    fail err
-        ) string)
-      ]
+        [ float
+        , field "$numberLong" (andThen (parse String.toFloat) string)
+        ]
 
 
 maybeEncodeDate maybe =
     case maybe of
         Just date ->
-            JE.float <| Date.toTime date
+            JE.float <| toFloat <| Time.posixToMillis date
 
         Nothing ->
             JE.null
-
-
-dateParser : Float -> Date
-dateParser input =
-    fromTime input
-
-

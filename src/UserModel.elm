@@ -1,8 +1,8 @@
-module UserModel exposing (..)
+module UserModel exposing (User, userDecoder, userEncoder)
 
-import Date exposing (Date)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
+import Time exposing (Posix)
 
 
 type alias User =
