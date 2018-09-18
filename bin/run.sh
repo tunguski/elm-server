@@ -10,7 +10,7 @@ mkdir -p public
 # compile server code
 # compile client code
 # start the server
-elm-make "src/ServerMain.elm" --output "target/server_main.js" \
-    && elm-make client/ClientMain.elm --output public/client.js \
+elm make "src/ServerMain.elm" --output "target/server_main.js" \
+    && elm make client/ClientMain.elm --output public/client.js \
     && node "$DIR/server.js" "`pwd`"
 

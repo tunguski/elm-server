@@ -44,7 +44,7 @@ program :
     -> PostRequestUpdater msg
     -> Program Never (Dict String Request) (ServerMsg msg)
 program initializer updater postRequestUpdater =
-    Platform.program
+    Platform.worker
         { init = ( empty, Cmd.none )
         , update = update initializer updater postRequestUpdater
         , subscriptions = subscriptions
