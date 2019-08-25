@@ -11,7 +11,9 @@ randomInt =
     Time.now
         |> Task.map
             (\seed ->
-                Random.step (Random.int Random.minInt Random.maxInt) (Random.initialSeed <| floor seed)
+                Random.step
+                    (Random.int Random.minInt Random.maxInt)
+                    (Random.initialSeed <| Time.posixToMillis seed)
                     |> Tuple.first
             )
 
@@ -23,13 +25,13 @@ randomIdentifier =
             (\seed ->
                 Random.step
                     (Random.list 8 <| Random.int 0 15)
-                    (Random.initialSeed <| floor seed)
-                    |> (\( result, seed ) ->
+                    (Random.initialSeed <| Time.posixToMillis seed)
+                    |> (\( result, seed_ ) ->
                             result
                                 |> List.map
                                     (\i ->
                                         if i < 10 then
-                                            toString i
+                                            Debug.toString i
 
                                         else
                                             "abcdef"

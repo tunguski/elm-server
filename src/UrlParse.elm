@@ -51,11 +51,11 @@ internal parser input =
                 -- first part is "" because url started of "/"
                 _ :: h :: t ->
                     case String.toInt h of
-                        Ok int ->
+                        Just int ->
                             chooseFirst (function int) ("/" ++ String.join "/" t)
 
-                        Err err ->
-                            Err err
+                        _ ->
+                            Err "Could not parser int"
 
                 _ ->
                     Err "No match found"

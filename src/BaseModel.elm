@@ -1,9 +1,9 @@
-module BaseModel exposing (Collection, collectionDecoder, encode, encodeCollection, listDecoder, listToValue, longFloat, longInt, longPosix, maybeEncodeDate)
+module BaseModel exposing (Collection, collectionDecoder, encode, encodeCollection, listDecoder, listToValue, longFloat, longInt, maybeEncodeDate)
 
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
 import Result exposing (toMaybe)
-import Time exposing (Posix)
+import Time
 
 
 type alias Collection item =
@@ -63,10 +63,6 @@ longInt =
         ]
 
 
-longPosix =
-    andThen (Time.millisToPosix >> succeed) int
-
-
 longFloat =
     oneOf
         [ float
@@ -77,7 +73,7 @@ longFloat =
 maybeEncodeDate maybe =
     case maybe of
         Just date ->
-            JE.float <| toFloat <| Time.posixToMillis date
+            JE.float <| toFloat date
 
         Nothing ->
             JE.null

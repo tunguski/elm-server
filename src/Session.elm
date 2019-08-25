@@ -2,7 +2,6 @@ module Session exposing (sessionApiPart)
 
 import ApiPartApi exposing (..)
 import BaseModel exposing (..)
-import Date
 import Dict
 import ExampleDb exposing (..)
 import Http exposing (Error(..))
@@ -11,6 +10,7 @@ import Rest exposing (..)
 import Server exposing (..)
 import SessionModel exposing (..)
 import Task exposing (..)
+import Time
 import UrlParse exposing (..)
 import UserModel exposing (..)
 
@@ -100,8 +100,8 @@ processGetSessionError request error =
                                             token
                                     )
                                     token
-                                    (Date.fromTime request.time)
-                                    (Date.fromTime request.time)
+                                    request.time
+                                    request.time
                                     token
                         in
                         put token newSession sessions

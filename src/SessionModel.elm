@@ -3,14 +3,14 @@ module SessionModel exposing (Session, encodeSession, sessionDecoder, sessionEnc
 import BaseModel exposing (..)
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
-import Time exposing (Posix)
+import Time
 
 
 type alias Session =
     { username : String
     , token : String
-    , loginTime : Posix
-    , lastRequestTime : Posix
+    , loginTime : Int
+    , lastRequestTime : Int
     , idUser : String
     }
 
@@ -20,8 +20,8 @@ sessionDecoder =
     Json.map5 Session
         (field "username" string)
         (field "token" string)
-        (field "loginTime" longPosix)
-        (field "lastRequestTime" longPosix)
+        (field "loginTime" longInt)
+        (field "lastRequestTime" longInt)
         (field "idUser" string)
 
 
@@ -30,8 +30,8 @@ sessionEncoder session =
     JE.object
         [ ( "username", JE.string session.username )
         , ( "token", JE.string session.token )
-        , ( "loginTime", JE.int <| Time.posixToMillis session.loginTime )
-        , ( "lastRequestTime", JE.int <| Time.posixToMillis session.lastRequestTime )
+        , ( "loginTime", JE.int session.loginTime )
+        , ( "lastRequestTime", JE.int session.lastRequestTime )
         , ( "idUser", JE.string session.idUser )
         ]
 

@@ -3,10 +3,10 @@ port module Server exposing (Initializer, Model, Partial(..), PortRequest, PortR
 import Dict exposing (Dict, empty)
 import Http exposing (Error(..))
 import Maybe
-import Platform exposing (program)
+import Platform exposing (worker)
 import String
 import Task
-import Time exposing (Time)
+import Time
 
 
 type Partial msg
@@ -42,10 +42,10 @@ program :
     Initializer msg
     -> Updater msg
     -> PostRequestUpdater msg
-    -> Program Never (Dict String Request) (ServerMsg msg)
+    -> Program () (Dict String Request) (ServerMsg msg)
 program initializer updater postRequestUpdater =
     Platform.worker
-        { init = ( empty, Cmd.none )
+        { init = \() -> ( empty, Cmd.none )
         , update = update initializer updater postRequestUpdater
         , subscriptions = subscriptions
         }
@@ -65,7 +65,7 @@ type RequestMethod
 
 type alias Request =
     { id : String
-    , time : Time
+    , time : Int
     , headers : List ( String, String )
     , queryParams : List ( String, String )
     , url : String
@@ -78,7 +78,7 @@ type alias Request =
 
 type alias PortRequest =
     { id : String
-    , time : Time
+    , time : Int
     , headers : List ( String, String )
     , queryParams : List ( String, String )
     , url : String
@@ -105,18 +105,18 @@ parseRequest r =
     case parseRequestMethod r.method of
         Just method ->
             let
-                request =
+                request_ =
                     baseRequest r
             in
             Just
-                { request
+                { request_
                     | method = method
-                    , idSession = getIdSession request
+                    , idSession = getIdSession request_
                     , test =
                         getHeaderDefault "X-Test-Session"
                             (\_ -> True)
                             False
-                            request
+                            request_
                 }
 
         Nothing ->
@@ -185,7 +185,7 @@ parseRequestMethod method =
 
 
 getCookies : Request -> Dict String String
-getCookies request =
+getCookies request_ =
     let
         extractCookie cookie =
             case String.split "=" <| String.trim cookie of
@@ -198,7 +198,7 @@ getCookies request =
         splitCookies cookie =
             String.split ";" cookie
     in
-    case getHeader "cookie" request of
+    case getHeader "cookie" request_ of
         Just cookies ->
             splitCookies cookies
                 |> List.map extractCookie
@@ -214,13 +214,13 @@ x_test_session =
 
 
 getIdSession : Request -> Maybe String
-getIdSession request =
-    case getHeader x_test_session request of
+getIdSession request_ =
+    case getHeader x_test_session request_ of
         Just id ->
             Just id
 
         Nothing ->
-            Dict.get "SESSIONID" <| getCookies request
+            Dict.get "SESSIONID" <| getCookies request_
 
 
 fakeResponse : Int -> Http.Response String
@@ -228,8 +228,8 @@ fakeResponse status =
     Http.Response "" { code = status, message = "" } Dict.empty ""
 
 
-executeIfIdSessionExists request task =
-    case request.idSession of
+executeIfIdSessionExists request_ task =
+    case request_.idSession of
         Just id ->
             task id
 
@@ -238,32 +238,32 @@ executeIfIdSessionExists request task =
 
 
 getHeaderDefault : String -> (String -> a) -> a -> Request -> a
-getHeaderDefault key mapper default request =
-    getHeader key request
+getHeaderDefault key mapper default request_ =
+    getHeader key request_
         |> Maybe.map mapper
         |> Maybe.withDefault default
 
 
 getHeader : String -> Request -> Maybe String
-getHeader key request =
-    List.filter (\( headerKey, value ) -> headerKey == String.toLower key) request.headers
+getHeader key request_ =
+    List.filter (\( headerKey, value ) -> headerKey == String.toLower key) request_.headers
         |> List.head
         |> Maybe.map (\( k, v ) -> v)
 
 
 setCookie : String -> String -> Response -> Response
-setCookie name value response =
-    { response | headers = ( name, value ) :: response.headers }
+setCookie name value response_ =
+    { response_ | headers = ( name, value ) :: response_.headers }
 
 
 containsParam : String -> Request -> Bool
-containsParam name request =
-    List.any (\( key, value ) -> key == name) request.queryParams
+containsParam name request_ =
+    List.any (\( key, value ) -> key == name) request_.queryParams
 
 
 getParam : String -> Request -> Maybe String
-getParam name request =
-    List.filter (\( key, value ) -> key == name) request.queryParams
+getParam name request_ =
+    List.filter (\( key, value ) -> key == name) request_.queryParams
         |> List.head
         |> Maybe.map (\( key, value ) -> value)
 
@@ -286,8 +286,8 @@ port sendResponsePort : PortResponse -> Cmd msg
 
 
 sendResponse : Request -> Response -> Cmd msg
-sendResponse request response =
-    PortResponse request.id response.headers response.statusCode response.body
+sendResponse request_ response_ =
+    PortResponse request_.id response_.headers response_.statusCode response_.body
         |> sendResponsePort
 
 
@@ -302,26 +302,26 @@ update initializer updater postRequestUpdater msg model =
     case msg of
         IncomingRequest r ->
             case parseRequest r of
-                Just request ->
-                    case initializer request of
-                        Result response ->
-                            case postRequestUpdater request of
-                                Just msg ->
-                                    ( Dict.insert request.id request model
+                Just request_ ->
+                    case initializer request_ of
+                        Result response_ ->
+                            case postRequestUpdater request_ of
+                                Just msg_ ->
+                                    ( Dict.insert request_.id request_ model
                                     , Cmd.batch
-                                        [ sendResponse request response
-                                        , Cmd.map (InternalPostRequestMsg request.id) msg
+                                        [ sendResponse request_ response_
+                                        , Cmd.map (InternalPostRequestMsg request_.id) msg_
                                         ]
                                     )
 
                                 Nothing ->
                                     ( model
-                                    , sendResponse request response
+                                    , sendResponse request_ response_
                                     )
 
                         Command cmd ->
-                            ( Dict.insert request.id request model
-                            , Cmd.map (InternalServerMsg request.id) cmd
+                            ( Dict.insert request_.id request_ model
+                            , Cmd.map (InternalServerMsg request_.id) cmd
                             )
 
                         Noop ->
@@ -336,21 +336,21 @@ update initializer updater postRequestUpdater msg model =
 
         InternalServerMsg idRequest internalMessage ->
             case Dict.get idRequest model of
-                Just request ->
-                    case updater request internalMessage of
-                        Result response ->
-                            case postRequestUpdater request of
-                                Just msg ->
+                Just request_ ->
+                    case updater request_ internalMessage of
+                        Result response_ ->
+                            case postRequestUpdater request_ of
+                                Just msg_ ->
                                     ( model
                                     , Cmd.batch
-                                        [ sendResponse request response
-                                        , Cmd.map (InternalPostRequestMsg request.id) msg
+                                        [ sendResponse request_ response_
+                                        , Cmd.map (InternalPostRequestMsg request_.id) msg_
                                         ]
                                     )
 
                                 Nothing ->
-                                    ( Dict.remove request.id model
-                                    , sendResponse request response
+                                    ( Dict.remove request_.id model
+                                    , sendResponse request_ response_
                                     )
 
                         Command cmd ->
@@ -371,9 +371,9 @@ update initializer updater postRequestUpdater msg model =
 
         InternalPostRequestMsg idRequest postRequestMsg ->
             case Dict.get idRequest model of
-                Just request ->
-                    case updater request postRequestMsg of
-                        Result response ->
+                Just request_ ->
+                    case updater request_ postRequestMsg of
+                        Result response_ ->
                             Debug.log "Illegal state" <|
                                 ( model
                                 , Cmd.none

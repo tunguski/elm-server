@@ -2,7 +2,7 @@ module UserModel exposing (User, userDecoder, userEncoder)
 
 import Json.Decode as Json exposing (..)
 import Json.Encode as JE
-import Time exposing (Posix)
+import Time
 
 
 type alias User =
