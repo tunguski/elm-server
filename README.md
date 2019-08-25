@@ -46,6 +46,14 @@ Run server
 * builds server side application
 * starts node server that forwards requests to Elm code
 
+### Updating elm dependencies
+
+    elm-json upgrade
+
+or if you want to upgrade major versions as well
+
+    elm-json upgrade --unsafe
+
 ### Interesting features
 
 * Server is able to process additional http requests (and generally all ```Tasks```) asynchronously before generating response.
